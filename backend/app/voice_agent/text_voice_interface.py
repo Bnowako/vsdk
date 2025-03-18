@@ -64,7 +64,7 @@ def split_by_words_or_by_fixed_interval_if_silence(audio_chunk: AudioChunk):
 
 # todo THIS FAILS REALLY QUIETLY IF THERE ARE SOME ISSUES WITH ELEVEN API, FIX THIS!!!!
 # to reproduce for example break api key
-class VoiceAgent:
+class TextVoiceInterface:
     def __init__(
         self,
         eleven: Config.Eleven = Config.Eleven(),

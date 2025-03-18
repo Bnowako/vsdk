@@ -11,7 +11,7 @@ from app.sockets.twilio_client import (
     send_stop_speaking,
     send_to_front,
 )
-from app.voice_agent.agent_coordinator import respond_to_human
+from backend.app.voice_agent.voice_agent_coordinator import respond_to_human
 from app.voice_agent.domain import RespondToHumanResult
 
 logger = logging.getLogger(__name__)
