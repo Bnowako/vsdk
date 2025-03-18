@@ -52,9 +52,7 @@ def process(conversation: Conversation):
 
     elif not speech_result.ended:
         if conversation.is_agent_speaking():
-            logger.info(
-                "🎙️🟢 Human and Agent are speaking."
-            )
+            logger.info("🎙️🟢 Human and Agent are speaking.")
             return ConversationState.BOTH_SPEAKING
         else:
             logger.info("🎙️🟢 Human started speaking")

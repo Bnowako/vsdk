@@ -18,6 +18,7 @@ agent = LLMAgent(
     system_prompt="You are a helpful assistant that can answer questions and help with tasks.",
 )
 
+
 async def respond_to_human(
     pcm_audio_buffer: bytes, sid: str, callback: Callable
 ) -> Generator[bytes, None, None]:
@@ -36,13 +37,12 @@ async def respond_to_human(
     )
     llm_result = {}
     output_llm_stream = agent.astream(
-        user_query=transcript.text, 
-        conversation_id=sid, 
-        callback=lambda x: llm_result.update(x)
+        user_query=transcript.text,
+        conversation_id=sid,
+        callback=lambda x: llm_result.update(x),
     )
     # create mock output llm stream
-   
-    
+
     # logger.info(f"Output LLM stream: {output_llm_stream}")
 
     voice_stream = voice_assistant.text_to_speech_streaming_ws(output_llm_stream)

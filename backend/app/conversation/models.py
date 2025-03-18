@@ -185,9 +185,9 @@ class Conversation:
         human_speech_without_response_buffers = self._cancel_unfinished_tasks()
         if human_speech_without_response_buffers:
             human_speech_without_response = (
-                    (b"\x00" * 2 * 80).join(human_speech_without_response_buffers)
-                    + b"\x00" * 2 * 80
-                    + self.last_human_speech
+                (b"\x00" * 2 * 80).join(human_speech_without_response_buffers)
+                + b"\x00" * 2 * 80
+                + self.last_human_speech
             )
             self.human_speech_without_response = human_speech_without_response
         else:
@@ -195,16 +195,15 @@ class Conversation:
 
     def _get_audio(self, from_sample: int, to_sample: int):
         logger.info(
-            f"👩🏼🗣️ Get audio requested, Requested audio length: {(to_sample - from_sample) // Config.Audio.bytes_per_sample / Config.Audio.sample_rate }s. pcm_audio_buffer length: {(len(self.pcm_audio_buffer) // Config.Audio.bytes_per_sample) / Config.Audio.sample_rate}s"
+            f"👩🏼🗣️ Get audio requested, Requested audio length: {(to_sample - from_sample) // Config.Audio.bytes_per_sample / Config.Audio.sample_rate}s. pcm_audio_buffer length: {(len(self.pcm_audio_buffer) // Config.Audio.bytes_per_sample) / Config.Audio.sample_rate}s"
         )
         from_bytes = (
-                from_sample * Config.Audio.bytes_per_sample
+            from_sample * Config.Audio.bytes_per_sample
         )  # 2 bytes per sample for 16-bit audio
         to_bytes = (
-                to_sample * Config.Audio.bytes_per_sample
+            to_sample * Config.Audio.bytes_per_sample
         )  # 2 bytes per sample for 16-bit audio
         return self.pcm_audio_buffer[from_bytes:to_bytes]
-
 
     # Agent Voice
     def new_agent_speech_start(self):
@@ -227,7 +226,6 @@ class Conversation:
 
     def is_agent_speaking(self) -> bool:
         return self.agent_voice.is_speaking()
-
 
     # Thinking
 

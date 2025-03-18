@@ -60,7 +60,8 @@ def split_by_words_or_by_fixed_interval_if_silence(audio_chunk: AudioChunk):
         )
         yield audio_chunk.audio[bytes_offset:next_word_start]
 
-#todo THIS FAILS REALLY QUIETLY IF THERE ARE SOME ISSUES WITH ELEVEN API, FIX THIS!!!!
+
+# todo THIS FAILS REALLY QUIETLY IF THERE ARE SOME ISSUES WITH ELEVEN API, FIX THIS!!!!
 # to reproduce for example break api key
 class VoiceAgent:
     def __init__(self, eleven=Config.Eleven, groq=Config.Groq, async_groq=Config.Groq):
@@ -165,7 +166,7 @@ class VoiceAgent:
             if audio_chunk is None:
                 break
             yield audio_chunk.audio
-            #TODO uncomment this
+            # TODO uncomment this
             # for word_audio_chunk in split_by_words_or_by_fixed_interval_if_silence(
             #     audio_chunk
             # ):
