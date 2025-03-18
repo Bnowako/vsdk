@@ -1,20 +1,203 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Audio Stream</title>
+  <title>Voice Assistant</title>
   <!-- It's recommended to use the latest stable version of Socket.IO -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #4A90E2;
+      --secondary-color: #F5F7FA;
+      --text-color: #2C3E50;
+      --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
+      margin: 0;
+      padding: 2rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 90%;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: var(--text-color);
+      font-size: 2.5rem;
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+
+    button {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      border-radius: 50px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: var(--shadow);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.recording {
+      background-color: #DC3545;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+    }
+
+    #conversation {
+      background: white;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 2rem;
+      height: 60vh;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+
+    #conversation h2 {
+      color: var(--text-color);
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+    }
+
+    .message {
+      background: var(--secondary-color);
+      padding: 1.5rem;
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .message-metrics {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+
+    .message-time {
+      font-size: 0.75rem;
+      color: #666;
+      background-color: #E9ECEF;
+      border-radius: 16px;
+      padding: 0.25rem 0.75rem;
+    }
+
+    .message-content {
+      margin-top: 0.5rem;
+    }
+
+    .transcript, .response {
+      margin: 0.5rem 0;
+      line-height: 1.5;
+    }
+
+    .transcript strong, .response strong {
+      color: var(--primary-color);
+    }
+
+    /* Scrollbar styling */
+    #conversation::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    #conversation::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    #conversation::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+
+    #conversation::-webkit-scrollbar-thumb:hover {
+      background: #666;
+    }
+
+    .metrics-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1rem;
+      background: rgba(74, 144, 226, 0.05);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .metrics-table th, .metrics-table td {
+      padding: 0.5rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(74, 144, 226, 0.1);
+    }
+
+    .metrics-table th {
+      background: rgba(74, 144, 226, 0.1);
+      font-weight: 500;
+      color: var(--primary-color);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+    }
+
+    .metrics-table td {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.9rem;
+    }
+
+    .metrics-table tr:last-child td {
+      border-bottom: none;
+    }
+  </style>
 </head>
 <body>
+  <div class="container">
+    <h1>Voice Assistant</h1>
 
-  <h1>Audio Stream</h1>
-  <button onclick="startStream()">Start talking</button>
-  <button onclick="startConversation()">Socket connect</button>
-  <button onclick="endConversation()">Socket disconnect</button>
+    <div class="controls">
+      <button id="talkButton" onclick="startStream()">
+        Start Talking
+      </button>
+      <button onclick="startConversation()">Connect</button>
+      <button onclick="endConversation()">Disconnect</button>
+    </div>
 
-  <div id="conversation">
-    <h2>Conversation</h2>
-    <!-- Messages will be appended here -->
+    <div id="conversation">
+      <h2>Conversation History</h2>
+      <!-- Messages will be appended here -->
+    </div>
   </div>
 
   <script>
@@ -161,8 +344,10 @@
     }
 
     function endConversation() {
+      const button = document.getElementById('talkButton');
+      button.classList.remove('recording');
+      button.textContent = 'Start Talking';
       if (socket) {
-        // Send ClosedEvent
         socket.send(JSON.stringify({ event: 'closed' }));
         socket.close();
         console.log('Disconnected');
@@ -171,6 +356,9 @@
 
     /***** Audio Functions *****/
     async function startStream() {
+      const button = document.getElementById('talkButton');
+      button.classList.add('recording');
+      button.textContent = 'Recording...';
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         console.log('Audio stream obtained:', stream);
@@ -298,20 +486,44 @@
 
     /***** Incoming Result Event Handler *****/
     function handleResultEvent(data) {
-      // data.result contains: stt_duration, llm_duration, tts_duration, total_duration, first_chunk_time, transcript, response
       const result = data.result;
-      const p = document.createElement('p');
-      p.innerHTML = `
-        <span class="message-time">STT: ${result.stt_duration}ms</span>
-        <span class="message-time">LLM: ${result.llm_duration}ms</span>
-        <span class="message-time">TTS: ${result.tts_duration}ms</span>
-        <span class="message-time">Total: ${result.total_duration}ms</span>
-        <span class="message-time">First Chunk: ${result.first_chunk_time}ms</span>
-        <strong>Transcript:</strong> ${result.transcript} <br>
-        <strong>Response:</strong> ${result.response}
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message';
+
+      // Format timing data
+      const timings = [
+        { label: 'Speech-to-Text', value: result.stt_duration, unit: 's' },
+        { label: 'AI Processing', value: result.llm_duration, unit: 's' },
+        { label: 'Text-to-Speech', value: result.tts_duration, unit: 's' },
+        { label: 'First Chunk', value: result.first_chunk_time, unit: 's' },
+        { label: 'Total Duration', value: result.total_duration, unit: 's' }
+      ];
+
+      messageDiv.innerHTML = `
+        <table class="metrics-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${timings.map(timing => `
+              <tr>
+                <td>${timing.label}</td>
+                <td>${timing.value.toLocaleString()} ${timing.unit}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="message-content">
+          <div class="transcript"><strong>You:</strong> ${result.transcript}</div>
+          <div class="response"><strong>Assistant:</strong> ${result.response}</div>
+        </div>
       `;
-      p.id = "result-message";
-      document.getElementById('conversation').appendChild(p);
+
+      document.getElementById('conversation').appendChild(messageDiv);
+      messageDiv.scrollIntoView({ behavior: 'smooth' });
     }
 
     function handleClearEvent() {
@@ -333,75 +545,4 @@
     }
   </script>
 </body>
-
-
-<head>
-  <style>
-    /* CSS remains unchanged */
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f9;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-    }
-
-    h1 {
-      color: #333;
-    }
-
-    #conversation {
-      width: 80%;
-      max-width: 600px;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-      overflow-y: auto;
-      padding: 20px;
-      margin-top: 20px;
-      height: 60vh;
-    }
-
-    #conversation h2 {
-      margin-top: 0;
-    }
-
-    #conversation p {
-      padding: 10px;
-      border-radius: 5px;
-      margin: 10px 0;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .message-time {
-      font-size: 0.8em;
-      color: #888;
-      margin-bottom: 5px;
-      background-color: #e0e0e0;
-      border-radius: 12px;
-      padding: 2px 8px;
-      display: inline-block;
-    }
-
-    button {
-      background-color: #007bff;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      margin: 5px;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #0056b3;
-    }
-  </style>
-
-</head>
 </html>
