@@ -81,12 +81,7 @@ async def db_lifespan(app: MongoFastAPI):
     else:
         logger.info("Connected to database cluster.")
 
-    await init_beanie(
-        database=app.database,
-        document_models=[
-            ExampleDocument,
-        ],
-    )
+    await init_beanie(database=app.database, document_models=[ExampleDocument])
 
     yield
     app.mongodb_client.close()

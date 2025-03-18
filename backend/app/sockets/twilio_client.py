@@ -35,14 +35,7 @@ async def send_to_front(
             }
         )
     )
-    await websocket.send_text(
-        json.dumps(
-            {
-                "event": "chat-response",
-                "data": llm_stats,
-            }
-        )
-    )
+    await websocket.send_text(json.dumps({"event": "chat-response", "data": llm_stats}))
     await websocket.send_text(json.dumps({"event": "tts-time", "data": tts_stats}))
 
 
