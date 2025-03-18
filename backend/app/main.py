@@ -1,21 +1,22 @@
-from app.config import create_app
-from fastapi.templating import Jinja2Templates
-from fastapi import Request
 import asyncio
 import base64
 import json
-from fastapi import WebSocket, WebSocketDisconnect
+import logging
+
+from fastapi import Request, WebSocket, WebSocketDisconnect
+from fastapi.templating import Jinja2Templates
+
 from app.agents.agent_coordinator import respond_to_human
 from app.audio.audio_utils import mulaw_to_pcm
-from app.conversation.conversation_processor import process, ConversationState
+from app.config import create_app
+from app.conversation.conversation_processor import ConversationState, process
 from app.conversation.models import Conversation
 from app.sockets.twilio_client import (
-    send_media,
     send_mark,
+    send_media,
     send_stop_speaking,
     send_to_front,
 )
-import logging
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -27,13 +28,16 @@ app = create_app()
 templates = Jinja2Templates(directory="templates")
 conversations_cache = {}
 
+
 @app.get("/status")
 async def main():
     return {"status": "OK"}
 
+
 @app.get("/")
 async def index(request: Request):
     return templates.TemplateResponse("main.html", {"request": request})
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
