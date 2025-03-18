@@ -1,94 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Audio Stream</title>
-    <!-- It's recommended to use the latest stable version of Socket.IO -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
-    <style>
-        /* CSS remains unchanged */
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-
-        h1 {
-            color: #333;
-        }
-
-        #conversation {
-            width: 80%;
-            max-width: 600px;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            overflow-y: auto;
-            padding: 20px;
-            margin-top: 20px;
-            height: 60vh;
-        }
-
-        #conversation h2 {
-            margin-top: 0;
-        }
-
-        #conversation p {
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        #human-message {
-            background-color: #d1e7dd;
-            align-self: flex-start;
-        }
-
-        #chat-message {
-            background-color: #f8d7da;
-            align-self: flex-end;
-        }
-
-        #started-speaking {
-            background-color: #007bff;
-            align-self: flex-end;
-        }
-
-        .message-time {
-            font-size: 0.8em;
-            color: #888;
-            margin-left: 10px;
-            background-color: #e0e0e0;
-            border-radius: 12px;
-            padding: 2px 8px;
-        }
-
-        button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            margin: 5px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-    </style>
+  <title>Audio Stream</title>
+  <!-- It's recommended to use the latest stable version of Socket.IO -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
 </head>
 <body>
-<!-- Form with URL and Phone Number inputs -->
-<form id="uploadForm" action="/form" method="POST" enctype="multipart/form-data">
+  <!-- Form with URL and Phone Number inputs -->
+  <form id="uploadForm" action="/form" method="POST" enctype="multipart/form-data">
     <label for="files">Files</label>
     <input id="files" type="file" name="files" multiple>
     <label for="url">URL:</label>
@@ -96,359 +15,448 @@
     <label for="phone">Phone: </label>
     <input id="phone" type="tel" name="phone" placeholder="Enter Phone Number" required>
     <button type="submit">Submit</button>
-</form>
-<h1>Audio Stream</h1>
-<button onclick="startStream()">Start talking</button>
-<button onclick="startConversation()">Socket connect</button>
-<button onclick="endConversation()">Socket disconnect</button>
-<div id="conversation">
+  </form>
+
+  <h1>Audio Stream</h1>
+  <button onclick="startStream()">Start talking</button>
+  <button onclick="startConversation()">Socket connect</button>
+  <button onclick="endConversation()">Socket disconnect</button>
+
+  <div id="conversation">
     <h2>Conversation</h2>
     <p id="transcript"></p>
-</div>
+  </div>
 
-<script>
+  <script>
+    /***** Configuration Constants *****/
+    const CONFIG = {
+      SOCKET_URL: 'ws://localhost:8000/ws',
+      AUDIO_SAMPLE_RATE: 8000,
+      SCRIPT_PROCESSOR_BUFFER_SIZE: 256,
+      INT16_NEGATIVE_MULTIPLIER: 0x8000, // 32768 for negative values
+      INT16_POSITIVE_MULTIPLIER: 0x7FFF, // 32767 for positive values
+      BIAS: 0x84,                      // 132
+      CLIP: 32635
+    };
 
-    document.getElementById('uploadForm').addEventListener('submit', function(event) {
-        event.preventDefault(); // Prevent the default form submission behavior
-
-        // Handle the form submission here (e.g., send data via AJAX)
-        const formData = new FormData(this);
-        fetch('/form', {
-            method: 'POST',
-            body: formData
-        })
-          .then(response => response.json())
-          .then(data => {
-              console.log('Form submitted successfully:', data);
-          })
-          .catch(error => {
-              console.error('Error submitting form:', error);
-          });
-    });
-    // Global Variables
+    /***** Global Variables *****/
     let socket;
     let pendingAudioChunks = [];
     let audioQueue = [];
     let isPlaying = false;
-    let audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 8000 });
-    const audioSampleRate = 8000;
+    let audioContext = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: CONFIG.AUDIO_SAMPLE_RATE
+    });
 
-    // Utility Functions
+    /***** Form Submission Handler *****/
+    document.getElementById('uploadForm').addEventListener('submit', function(event) {
+      event.preventDefault(); // Prevent default form submission
+
+      const formData = new FormData(this);
+      fetch('/form', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log('Form submitted successfully:', data);
+      })
+      .catch(error => {
+        console.error('Error submitting form:', error);
+      });
+    });
+
+    /***** Utility Functions *****/
     function generateId(length) {
-        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        let result = '';
-        const charactersLength = characters.length;
-        for (let i = 0; i < length; i++) {
-            result += characters.charAt(Math.floor(Math.random() * charactersLength));
-        }
-        return result;
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      return result;
     }
 
     function float32ToInt16(float32Array) {
-        const int16Array = new Int16Array(float32Array.length);
-        for (let i = 0; i < float32Array.length; i++) {
-            let s = Math.max(-1, Math.min(1, float32Array[i]));
-            int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-        return int16Array;
+      const int16Array = new Int16Array(float32Array.length);
+      for (let i = 0; i < float32Array.length; i++) {
+        const s = Math.max(-1, Math.min(1, float32Array[i]));
+        int16Array[i] = s < 0
+          ? s * CONFIG.INT16_NEGATIVE_MULTIPLIER
+          : s * CONFIG.INT16_POSITIVE_MULTIPLIER;
+      }
+      return int16Array;
     }
 
     function int16ToMuLaw(int16Array) {
-        const muLawArray = new Uint8Array(int16Array.length);
-        for (let i = 0; i < int16Array.length; i++) {
-            muLawArray[i] = linearToMuLawSample(int16Array[i]);
-        }
-        return muLawArray;
+      const muLawArray = new Uint8Array(int16Array.length);
+      for (let i = 0; i < int16Array.length; i++) {
+        muLawArray[i] = linearToMuLawSample(int16Array[i]);
+      }
+      return muLawArray;
     }
 
     function linearToMuLawSample(sample) {
-        const BIAS = 0x84; // 132
-        const CLIP = 32635;
+      // Clip the sample
+      sample = Math.max(-CONFIG.CLIP, Math.min(CONFIG.CLIP, sample));
 
-        // Clip the sample
-        sample = Math.max(-CLIP, Math.min(CLIP, sample));
+      // Determine sign and adjust sample if negative
+      let sign = (sample < 0) ? 0x80 : 0;
+      if (sign !== 0) {
+        sample = -sample;
+      }
 
-        // Get the sign and the magnitude of the sample.
-        let sign = (sample < 0) ? 0x80 : 0;
-        if (sign !== 0) {
-            sample = -sample;
-        }
-
-        // Add bias
-        sample += BIAS;
-
-        // Convert the scaled magnitude to segment number.
-        let exponent = getExponent(sample);
-        let mantissa = (sample >> (exponent + 3)) & 0x0F;
-        let muLawByte = ~(sign | (exponent << 4) | mantissa);
-
-        return muLawByte;
+      // Add bias and compute exponent and mantissa
+      sample += CONFIG.BIAS;
+      const exponent = getExponent(sample);
+      const mantissa = (sample >> (exponent + 3)) & 0x0F;
+      const muLawByte = ~(sign | (exponent << 4) | mantissa);
+      return muLawByte;
     }
 
     function getExponent(sample) {
-        let exponent = 7;
-        for (let expMask = 0x4000; (sample & expMask) === 0 && exponent > 0; exponent--, expMask >>= 1);
-        return exponent;
+      let exponent = 7;
+      for (let expMask = 0x4000; (sample & expMask) === 0 && exponent > 0; exponent--, expMask >>= 1);
+      return exponent;
     }
 
     function muLawDecode(muLawByte) {
-        muLawByte = ~muLawByte & 0xFF;
-        const sign = (muLawByte & 0x80) ? -1 : 1;
-        const exponent = (muLawByte & 0x70) >> 4;
-        const mantissa = muLawByte & 0x0F;
-        const magnitude = ((mantissa << 4) + 8) << exponent;
-        return sign * magnitude;
+      muLawByte = ~muLawByte & 0xFF;
+      const sign = (muLawByte & 0x80) ? -1 : 1;
+      const exponent = (muLawByte & 0x70) >> 4;
+      const mantissa = muLawByte & 0x0F;
+      const magnitude = ((mantissa << 4) + 8) << exponent;
+      return sign * magnitude;
     }
 
-    // WebSocket Functions
+    /***** WebSocket Functions *****/
     function startConversation() {
-        socket = new WebSocket('ws://localhost:8000/ws');
+      socket = new WebSocket(CONFIG.SOCKET_URL);
 
-        socket.onopen = () => {
-            socket.send(JSON.stringify({
-                event: 'start',
-                start: {
-                    streamSid: generateId(32),
-                    accountSid: generateId(32),
-                    callSid: generateId(32),
-                }
-            }));
-        };
+      socket.onopen = () => {
+        socket.send(JSON.stringify({
+          event: 'start',
+          start: {
+            streamSid: generateId(32),
+            accountSid: generateId(32),
+            callSid: generateId(32)
+          }
+        }));
+      };
 
-        socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        switch (data.event) {
+          case 'transcript':
+            handleTranscriptEvent(data);
+            break;
+          case 'chat-response':
+            handleChatResponseEvent(data);
+            break;
+          case 'tts-time':
+            handleTTSTimeEvent(data);
+            break;
+          case 'media':
+            handleMediaEvent(data);
+            break;
+          case 'mark':
+            handleMarkEvent(data);
+            break;
+          case 'clear':
+            handleClearEvent();
+            break;
+          default:
+            console.warn('Unknown event type:', data.event);
+        }
+      };
 
-            switch (data.event) {
-                case 'transcript':
-                    handleTranscriptEvent(data);
-                    break;
-                case 'chat-response':
-                    handleChatResponseEvent(data);
-                    break;
-                case 'tts-time':
-                    handleTTSTimeEvent(data);
-                    break;
-                case 'media':
-                    handleMediaEvent(data);
-                    break;
-                case 'mark':
-                    handleMarkEvent(data);
-                    break;
-                case 'clear':
-                    handleClearEvent();
-                    break;
-                default:
-                    console.warn('Unknown event type:', data.event);
-            }
-        };
-
-        socket.onclose = () => {
-            console.log('Disconnected');
-        };
+      socket.onclose = () => {
+        console.log('Disconnected');
+      };
     }
 
     function endConversation() {
-        if (socket) {
-            socket.send(JSON.stringify({ event: 'closed' }));
-            socket.close();
-            console.log('Disconnected');
-        }
+      if (socket) {
+        socket.send(JSON.stringify({ event: 'closed' }));
+        socket.close();
+        console.log('Disconnected');
+      }
     }
 
-    // Audio Functions
+    /***** Audio Functions *****/
     async function startStream() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            console.log('Audio stream obtained:', stream);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('Audio stream obtained:', stream);
 
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: audioSampleRate });
-            console.log('AudioContext sample rate:', audioContext.sampleRate);
+        // Create a separate AudioContext for this stream
+        const localAudioContext = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: CONFIG.AUDIO_SAMPLE_RATE
+        });
+        console.log('AudioContext sample rate:', localAudioContext.sampleRate);
 
-            const source = audioContext.createMediaStreamSource(stream);
-            const processor = audioContext.createScriptProcessor(256, 1, 1);
+        const source = localAudioContext.createMediaStreamSource(stream);
+        const processor = localAudioContext.createScriptProcessor(
+          CONFIG.SCRIPT_PROCESSOR_BUFFER_SIZE, 1, 1
+        );
 
-            source.connect(processor);
-            processor.connect(audioContext.destination);
+        source.connect(processor);
+        processor.connect(localAudioContext.destination);
 
-            processor.onaudioprocess = (e) => {
-                const inputBuffer = e.inputBuffer.getChannelData(0);
+        processor.onaudioprocess = (e) => {
+          const inputBuffer = e.inputBuffer.getChannelData(0);
+          const int16Buffer = float32ToInt16(inputBuffer);
+          const muLawBuffer = int16ToMuLaw(int16Buffer);
+          const base64Buffer = btoa(String.fromCharCode.apply(null, muLawBuffer));
 
-                // Convert Float32Array to Int16Array
-                const int16Buffer = float32ToInt16(inputBuffer);
-
-                // Encode Int16Array to μ-law
-                const muLawBuffer = int16ToMuLaw(int16Buffer);
-
-                // Encode μ-law data to base64
-                const base64Buffer = btoa(String.fromCharCode.apply(null, muLawBuffer));
-
-                // Send μ-law data over WebSocket
-                socket.send(JSON.stringify({ event: 'media', media: { payload: base64Buffer } }));
-            };
-        } catch (err) {
-            console.error('Error accessing audio stream:', err);
-        }
+          socket.send(JSON.stringify({
+            event: 'media',
+            media: { payload: base64Buffer }
+          }));
+        };
+      } catch (err) {
+        console.error('Error accessing audio stream:', err);
+      }
     }
 
     function handleMediaEvent(data) {
-        const encodedPayload = data.media.payload;
+      const encodedPayload = data.media.payload;
+      // Decode base64 to Uint8Array (μ-law encoded bytes)
+      const muLawBytes = Uint8Array.from(atob(encodedPayload), c => c.charCodeAt(0));
 
-        // Decode base64 to Uint8Array (μ-law encoded bytes)
-        const muLawBytes = Uint8Array.from(atob(encodedPayload), c => c.charCodeAt(0));
+      // Decode μ-law bytes to PCM samples
+      const pcmSamples = new Int16Array(muLawBytes.length);
+      for (let i = 0; i < muLawBytes.length; i++) {
+        pcmSamples[i] = muLawDecode(muLawBytes[i]);
+      }
 
-        // Decode μ-law bytes to PCM samples
-        const pcmSamples = new Int16Array(muLawBytes.length);
-        for (let i = 0; i < muLawBytes.length; i++) {
-            pcmSamples[i] = muLawDecode(muLawBytes[i]);
-        }
+      // Normalize PCM samples to Float32Array in range [-1, 1]
+      const float32Samples = new Float32Array(pcmSamples.length);
+      for (let i = 0; i < pcmSamples.length; i++) {
+        float32Samples[i] = pcmSamples[i] / 32768; // 32768 = 2^15
+      }
 
-        // Normalize PCM samples to Float32Array in range [-1, 1]
-        const float32Samples = new Float32Array(pcmSamples.length);
-        for (let i = 0; i < pcmSamples.length; i++) {
-            float32Samples[i] = pcmSamples[i] / 32768; // 32768 = 2^15
-        }
-
-        // Push the samples into the audio queue
-        audioQueue.push(float32Samples);
-        pendingAudioChunks.push({ samples: float32Samples, markId: null });
+      // Add samples to the queue and pending chunks
+      audioQueue.push(float32Samples);
+      pendingAudioChunks.push({ samples: float32Samples, markId: null });
     }
 
     function handleMarkEvent(data) {
-        console.log("Received mark");
-        const markId = data.mark.name;
-
-        // Associate the markId with the first unmarked audio chunk
-        const unmarkedChunk = pendingAudioChunks.find(chunk => chunk.markId === null);
-        if (unmarkedChunk) {
-            unmarkedChunk.markId = markId;
-        }
-
-        // Start playing if not already playing
-        if (!isPlaying) {
-            playNextAudio();
-        }
+      console.log("Received mark");
+      const markId = data.mark.name;
+      // Associate the markId with the first unmarked audio chunk
+      const unmarkedChunk = pendingAudioChunks.find(chunk => chunk.markId === null);
+      if (unmarkedChunk) {
+        unmarkedChunk.markId = markId;
+      }
+      // Start playing if not already playing
+      if (!isPlaying) {
+        playNextAudio();
+      }
     }
 
     function playNextAudio() {
-        // Find the next chunk that has a markId assigned
-        const nextChunkIndex = pendingAudioChunks.findIndex(chunk => chunk.markId !== null);
-        console.log("Playing next audio", nextChunkIndex);
+      // Find the next chunk with an assigned markId
+      const nextChunkIndex = pendingAudioChunks.findIndex(chunk => chunk.markId !== null);
+      console.log("Playing next audio", nextChunkIndex);
 
-        if (nextChunkIndex === -1) {
-            isPlaying = false;
-            return;
-        }
-        isPlaying = true;
-        const chunk = pendingAudioChunks.splice(nextChunkIndex, 1)[0];
+      if (nextChunkIndex === -1) {
+        isPlaying = false;
+        return;
+      }
+      isPlaying = true;
+      const chunk = pendingAudioChunks.splice(nextChunkIndex, 1)[0];
 
-        playAudio(chunk.samples, () => {
-            // Send the 'mark' event back to the server
-            sendMarkEventToServer(chunk.markId);
-
-            // Play the next audio chunk
-            playNextAudio();
-        });
+      playAudio(chunk.samples, () => {
+        sendMarkEventToServer(chunk.markId);
+        playNextAudio();
+      });
     }
 
     function playAudio(float32Samples, callback) {
-        console.log(`Playing audio chunk - ${float32Samples.length} samples`, float32Samples);
-        const buffer = audioContext.createBuffer(1, float32Samples.length, audioSampleRate);
-        buffer.copyToChannel(float32Samples, 0);
+      console.log(`Playing audio chunk - ${float32Samples.length} samples`, float32Samples);
+      const buffer = audioContext.createBuffer(1, float32Samples.length, CONFIG.AUDIO_SAMPLE_RATE);
+      buffer.copyToChannel(float32Samples, 0);
 
-        const source = audioContext.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioContext.destination);
-        source.onended = callback;
-        source.start(0);
+      const source = audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioContext.destination);
+      source.onended = callback;
+      source.start(0);
     }
 
     function sendMarkEventToServer(markId) {
-        const msg = {
-            event: 'mark',
-            streamSid: '',
-            mark: { name: markId }
-        };
-        socket.send(JSON.stringify(msg));
+      const message = {
+        event: 'mark',
+        streamSid: '',
+        mark: { name: markId }
+      };
+      socket.send(JSON.stringify(message));
     }
 
     function stopAudio() {
-        // Clear the pendingAudioChunks
-        pendingAudioChunks = [];
+      // Clear any pending audio chunks
+      pendingAudioChunks = [];
 
-        // Stop the currently playing audio
-        if (audioContext && audioContext.state !== 'closed') {
-            audioContext.close().then(() => {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: audioSampleRate });
-            });
-        }
-
-        isPlaying = false;
-        console.log('Audio stopped');
+      // Close and reinitialize the AudioContext if needed
+      if (audioContext && audioContext.state !== 'closed') {
+        audioContext.close().then(() => {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: CONFIG.AUDIO_SAMPLE_RATE
+          });
+        });
+      }
+      isPlaying = false;
+      console.log('Audio stopped');
     }
 
-    // Event Handlers
+    /***** Event Handlers *****/
     function handleTranscriptEvent(data) {
-        console.log('Transcript:', data.data);
-        const p = document.createElement('p');
-        p.innerHTML = `<span class="message-time">${data.elapsed_time}ms</span> Human: ${data.data}`;
-        p.id = "human-message";
+      console.log('Transcript:', data.data);
+      const p = document.createElement('p');
+      p.innerHTML = `<span class="message-time">${data.elapsed_time}ms</span> Human: ${data.data}`;
+      p.id = "human-message";
 
-        if (data.file) {
-            const audioBlob = new Blob([Uint8Array.from(atob(data.file), c => c.charCodeAt(0))], { type: 'audio/wav' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            const audioElement = document.createElement('audio');
-            audioElement.controls = true;
-            audioElement.src = audioUrl;
-            p.appendChild(audioElement);
-        }
-
-        document.getElementById('conversation').appendChild(p);
+      if (data.file) {
+        const audioBlob = new Blob(
+          [Uint8Array.from(atob(data.file), c => c.charCodeAt(0))],
+          { type: 'audio/wav' }
+        );
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audioElement = document.createElement('audio');
+        audioElement.controls = true;
+        audioElement.src = audioUrl;
+        p.appendChild(audioElement);
+      }
+      document.getElementById('conversation').appendChild(p);
     }
 
     function handleChatResponseEvent(data) {
-        const chatResponse = data.data;
-        const p = document.createElement('p');
-        p.innerHTML = `
-            First Chunk: <span class="message-time">${chatResponse.first_chunk_time}ms</span>
-            Total time: <span class="message-time">${chatResponse.total_time}ms</span>
-            Agent: ${chatResponse.full_response}
-        `;
-        p.id = "chat-message";
-        document.getElementById('conversation').appendChild(p);
+      const chatResponse = data.data;
+      const p = document.createElement('p');
+      p.innerHTML = `
+        First Chunk: <span class="message-time">${chatResponse.first_chunk_time}ms</span>
+        Total time: <span class="message-time">${chatResponse.total_time}ms</span>
+        Agent: ${chatResponse.full_response}
+      `;
+      p.id = "chat-message";
+      document.getElementById('conversation').appendChild(p);
     }
 
     function handleTTSTimeEvent(data) {
-        const ttsStats = data.data;
-        const p = document.createElement('p');
-        p.innerHTML = `
-            TTS: <span class="message-time">${ttsStats.tts}ms</span>
-            First Chunk: <span class="message-time">${ttsStats.to_first_byte}ms</span>
-            Silence to First Chunk: <span class="message-time">${ttsStats.silence_to_first_audio_chunk}ms</span>
-        `;
-        p.id = "started-speaking";
-        document.getElementById('conversation').appendChild(p);
+      const ttsStats = data.data;
+      const p = document.createElement('p');
+      p.innerHTML = `
+        TTS: <span class="message-time">${ttsStats.tts}ms</span>
+        First Chunk: <span class="message-time">${ttsStats.to_first_byte}ms</span>
+        Silence to First Chunk: <span class="message-time">${ttsStats.silence_to_first_audio_chunk}ms</span>
+      `;
+      p.id = "started-speaking";
+      document.getElementById('conversation').appendChild(p);
     }
 
-    // Handling the 'clear' event
     function handleClearEvent() {
-        sendMarksForRemainingChunks();
-        stopAudio();
+      sendMarksForRemainingChunks();
+      stopAudio();
     }
 
     function sendMarksForRemainingChunks() {
-        pendingAudioChunks.forEach(chunk => {
-            if (chunk.markId !== null) {
-                sendMarkEventToServer(chunk.markId);
-            } else {
-                // If the chunk doesn't have a markId, we need to generate one
-                // and inform the server that we've processed this chunk
-                const tempMarkId = generateId(10);
-                chunk.markId = tempMarkId;
-                sendMarkEventToServer(tempMarkId);
-            }
-        });
-        pendingAudioChunks = [];
+      pendingAudioChunks.forEach(chunk => {
+        if (chunk.markId !== null) {
+          sendMarkEventToServer(chunk.markId);
+        } else {
+          // Generate a temporary markId if none exists
+          const tempMarkId = generateId(10);
+          chunk.markId = tempMarkId;
+          sendMarkEventToServer(tempMarkId);
+        }
+      });
+      pendingAudioChunks = [];
     }
-</script>
+  </script>
 </body>
+
+<head>
+    <style>
+        /* CSS remains unchanged */
+        body {
+          font-family: Arial, sans-serif;
+          background-color: #f4f4f9;
+          margin: 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+        }
+
+        h1 {
+          color: #333;
+        }
+
+        #conversation {
+          width: 80%;
+          max-width: 600px;
+          background: #fff;
+          border-radius: 8px;
+          box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+          overflow-y: auto;
+          padding: 20px;
+          margin-top: 20px;
+          height: 60vh;
+        }
+
+        #conversation h2 {
+          margin-top: 0;
+        }
+
+        #conversation p {
+          padding: 10px;
+          border-radius: 5px;
+          margin: 10px 0;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        #human-message {
+          background-color: #d1e7dd;
+          align-self: flex-start;
+        }
+
+        #chat-message {
+          background-color: #f8d7da;
+          align-self: flex-end;
+        }
+
+        #started-speaking {
+          background-color: #007bff;
+          align-self: flex-end;
+        }
+
+        .message-time {
+          font-size: 0.8em;
+          color: #888;
+          margin-left: 10px;
+          background-color: #e0e0e0;
+          border-radius: 12px;
+          padding: 2px 8px;
+        }
+
+        button {
+          background-color: #007bff;
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          margin: 5px;
+          border-radius: 5px;
+          cursor: pointer;
+        }
+
+        button:hover {
+          background-color: #0056b3;
+        }
+      </style>
+</head>
+
 </html>
