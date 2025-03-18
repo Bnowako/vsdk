@@ -6,17 +6,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
 </head>
 <body>
-  <!-- Form with URL and Phone Number inputs -->
-  <form id="uploadForm" action="/form" method="POST" enctype="multipart/form-data">
-    <label for="files">Files</label>
-    <input id="files" type="file" name="files" multiple>
-    <label for="url">URL:</label>
-    <input id="url" type="url" name="url" placeholder="Enter URL" required>
-    <label for="phone">Phone: </label>
-    <input id="phone" type="tel" name="phone" placeholder="Enter Phone Number" required>
-    <button type="submit">Submit</button>
-  </form>
-
   <h1>Audio Stream</h1>
   <button onclick="startStream()">Start talking</button>
   <button onclick="startConversation()">Socket connect</button>
