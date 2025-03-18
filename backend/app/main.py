@@ -20,11 +20,9 @@ from app.sockets.twilio_client import (
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-
 LOCAL = True
-
 app = create_app()
-
+logger.info(f"App: {app}")
 templates = Jinja2Templates(directory="templates")
 conversations_cache = {}
 
