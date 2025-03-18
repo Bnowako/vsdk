@@ -4,6 +4,7 @@ import json
 from fastapi import WebSocket
 
 from app.conversation.models import Conversation
+from app.voice_agent.domain import RespondToHumanResult
 
 
 async def send_media(bytez: bytes, websocket: WebSocket, sid: str):
@@ -19,24 +20,25 @@ async def send_mark(websocket: WebSocket, mark_id: str, sid: str):
 
 async def send_to_front(
     websocket: WebSocket,
-    transcript: str,
-    stt_time: float,
-    bytes_data: bytes,
-    llm_stats: str,
-    tts_stats: str,
+    result: RespondToHumanResult,
 ):
     await websocket.send_text(
         json.dumps(
             {
                 "event": "transcript",
-                "data": transcript,
-                "elapsed_time": stt_time,
-                "file": base64.b64encode(bytes_data).decode("utf-8"),
+                "data": result.stt_result.transcript,
+                "elapsed_time": result.stt_result.stt_end_time
+                - result.stt_result.stt_start_time,
+                "file": base64.b64encode(result.stt_result.speech_file).decode("utf-8"),
             }
         )
     )
-    await websocket.send_text(json.dumps({"event": "chat-response", "data": llm_stats}))
-    await websocket.send_text(json.dumps({"event": "tts-time", "data": tts_stats}))
+    await websocket.send_text(
+        json.dumps({"event": "chat-response", "data": result.llm_result.response})
+    )
+    await websocket.send_text(
+        json.dumps({"event": "tts-time", "data": result.tts_result.response})
+    )
 
 
 async def send_stop_speaking(websocket: WebSocket, client_data: Conversation):

@@ -3,7 +3,7 @@ Langchain agent
 """
 
 import logging
-from typing import Any, AsyncGenerator, Callable, Dict, Optional, List
+from typing import AsyncGenerator, Callable, Optional, List
 
 import time
 from langchain.chat_models.base import BaseChatModel
@@ -16,6 +16,8 @@ from langchain_core.messages import (
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
+
+from app.voice_agent.domain import LLMResult, STTResult
 
 
 logger = logging.getLogger(__name__)
@@ -53,9 +55,9 @@ class LLMAgent:
 
     async def astream(
         self,
-        user_query: str,
+        stt_result: STTResult,
         conversation_id: str,
-        callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        callback: Optional[Callable[[LLMResult], None]] = None,
     ) -> AsyncGenerator[str, None]:
         logger.error("Starting astream")
 
@@ -65,7 +67,7 @@ class LLMAgent:
 
         async for msg, _ in self.agent.astream(
             stream_mode="messages",
-            input={"messages": [HumanMessage(content=user_query)]},
+            input={"messages": [HumanMessage(content=stt_result.transcript)]},
             config={"configurable": {"thread_id": conversation_id}},
         ):
             if isinstance(msg, AIMessageChunk):
@@ -80,19 +82,15 @@ class LLMAgent:
                 # Yield the content chunk
                 yield content
 
-        # Record the total time to generate the response
-        total_time = time.time() - start_time
-
         # Invoke the callback once at the end with all the data
         if callback:
             callback(
-                {
-                    "full_response": full_response,
-                    "first_chunk_time": first_chunk_time * 1000
-                    if first_chunk_time
-                    else None,
-                    "total_time": total_time * 1000,
-                }
+                LLMResult(
+                    start_time=start_time,
+                    end_time=time.time(),
+                    first_chunk_time=first_chunk_time if first_chunk_time else 0,
+                    response=full_response,
+                )
             )
 
     async def adebug_ask(

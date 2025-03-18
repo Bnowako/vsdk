@@ -1,10 +1,8 @@
 import asyncio
 import logging
-from typing import Any, Dict
 
 from fastapi import WebSocket
 
-from app.agents.agent_coordinator import respond_to_human
 from app.conversation.conversation_processor import ConversationState, process
 from app.conversation.models import Conversation
 from app.sockets.twilio_client import (
@@ -13,11 +11,8 @@ from app.sockets.twilio_client import (
     send_stop_speaking,
     send_to_front,
 )
-from app.voice_agent.schemas import (
-    ChatResponseData,
-    TranscriptEvent,
-    TTSTimeData,
-)
+from app.voice_agent.agent_coordinator import respond_to_human
+from app.voice_agent.domain import RespondToHumanResult
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +63,7 @@ async def audio_interpreter_loop(conversation: Conversation, websocket: WebSocke
 
 async def handle_respond_to_human(conversation: Conversation, websocket: WebSocket):
     try:
-        result: Dict[str, Any] = {}
+        result: RespondToHumanResult = RespondToHumanResult.empty()
         conversation.new_agent_speech_start()
         async for chunk in respond_to_human(
             pcm_audio_buffer=conversation.human_speech_without_response,
@@ -79,33 +74,9 @@ async def handle_respond_to_human(conversation: Conversation, websocket: WebSock
             mark_id = conversation.agent_speech_sent(chunk)
             await send_mark(websocket, mark_id, conversation.sid)
 
-        transcript_event = TranscriptEvent(
-            data=result["transcript"]["text"],
-            elapsed_time=result["stt_time"],
-            file=result["human_speech_wav"],
-        )
-
-        chat_response = ChatResponseData(
-            first_chunk_time=result["llm_result"]["first_chunk_time"],
-            total_time=result["llm_result"]["total_time"],
-            full_response=result["llm_result"]["full_response"],
-        )
-
-        tts_time = TTSTimeData(
-            tts=result["tts_stats"]["tts"],
-            to_first_byte=result["tts_stats"]["to_first_byte"],
-            silence_to_first_audio_chunk=result["tts_stats"][
-                "silence_to_first_audio_chunk"
-            ],
-        )
-
         await send_to_front(
             websocket=websocket,
-            transcript=transcript_event.data,
-            stt_time=transcript_event.elapsed_time,
-            bytes_data=result["human_speech_wav"],
-            llm_stats=chat_response.model_dump_json(),
-            tts_stats=tts_time.model_dump_json(),
+            result=result,
         )
     except Exception as e:
         logger.error(f"Exception in handle_respond_to_human: {e}")
