@@ -16,7 +16,7 @@ class AgentSpeechChunk:
 
 
 class AgentResponseTask:
-    def __init__(self, human_speech: bytes, task: Task):
+    def __init__(self, human_speech: bytes, task: Task[None]):
         self.human_speech = human_speech
         self.task = task
 
@@ -27,7 +27,7 @@ class AgentSpeech:
         self.pointer = 0
         self.stop_sent_at = None
 
-    def mark(self, chunk_idx):
+    def mark(self, chunk_idx: int):
         self.pointer = chunk_idx
 
     def stop_sent(self):
@@ -170,10 +170,16 @@ class Conversation:
 
     def human_speech_ended(self, speech_result: VADResult):
         logger.debug("👩🏼🗣️ Human speech ended. ")  # todo add more logs
-        self.last_human_speech = self._get_audio(
-            from_sample=speech_result.start_sample, to_sample=speech_result.end_sample
-        )
-        self.clear_human_speech()
+        if speech_result.end_sample is not None:
+            self.last_human_speech = self._get_audio(
+                from_sample=speech_result.start_sample,
+                to_sample=speech_result.end_sample,
+            )
+            self.clear_human_speech()
+        else:
+            logger.warning(
+                f"👩🏼🗣️ Human speech ended invoked but end_sample is None. start_sample: {speech_result.start_sample}, end_sample: {speech_result.end_sample}"
+            )
 
     def prepare_human_speech_for_interpretation(self):
         """
@@ -243,7 +249,7 @@ class Conversation:
         :return:
         """
         logger.debug("🧠 Cancelling unfinished tasks.")
-        cancelled_speeches = []
+        cancelled_speeches: list[bytes] = []
         for agent_response_task in self.agent_response_tasks:
             if (
                 not agent_response_task.task.done()
@@ -260,7 +266,10 @@ class Conversation:
 
     def end_conversation(self):
         logger.debug("💬 Ending conversation.")
-        self.audio_interpreter_loop.cancel()
+        if self.audio_interpreter_loop:
+            self.audio_interpreter_loop.cancel()
+        else:
+            logger.warning("💬 Audio interpreter loop not found. Cannot cancel.")
 
     def is_new_audio_ready_to_process(self):
         return len(self.new_pcm_audio) >= Config.Audio.silero_samples_size_bytes

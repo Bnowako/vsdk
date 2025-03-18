@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class VADResult:
-    start_sample: int | float
-    end_sample: int | float | None
+    start_sample: int
+    end_sample: int | None
     ended: bool
 
     def is_shorter_than(self, ms: int) -> bool:
@@ -41,7 +41,7 @@ class VADResult:
 
 # A global dictionary to store VADIterator instances per sid
 vad_iterator_dict: dict[str, VADIterator] = {}
-vad_speech_dict: dict[str, dict[str, int | float]] = {}
+vad_speech_dict: dict[str, dict[str, int]] = {}
 
 
 def silero_iterator(pcm_audio: bytes, sid: str) -> VADResult | None:
@@ -62,9 +62,9 @@ def silero_iterator(pcm_audio: bytes, sid: str) -> VADResult | None:
 
     if sid not in vad_iterator_dict:
         logger.debug(f"Creating NEW VADIterator for sid: {sid}")
-        model: OnnxWrapper = (
+        model: OnnxWrapper = (  # type: ignore
             load_silero_vad()
-        )  # Load the Silero VAD model # type: ignore
+        )  # Load the Silero VAD model
         vad_iterator = VADIterator(
             model=model,
             threshold=Config.Audio.silero_threshold,
@@ -87,7 +87,7 @@ def silero_iterator(pcm_audio: bytes, sid: str) -> VADResult | None:
                 f"Audio data needs to be multiply of {window_size} samples for 8kHz audio"
             )  # This is checked before, but let's leave this line in case somebody removes the upper part :D
 
-        result = vad_iterator(chunk)
+        result: dict[str, int] | None = vad_iterator(x=chunk, return_seconds=False)  # type: ignore return_seconds = False implies int as a return type
         if result:
             if "start" in result:
                 speech_dict["start"] = result["start"]
