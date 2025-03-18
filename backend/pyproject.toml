@@ -22,3 +22,7 @@ dependencies = [
     "elevenlabs==1.9.0",
     "silero-vad==5.1.2",
 ]
+
+
+[ruff]
+line-length = 100
