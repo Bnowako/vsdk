@@ -1,0 +1,31 @@
+[project]
+name = "vsdk"
+version = "0.1.0"
+description = "Voice SDK for voice agents"
+authors = [{name = "Błażej Nowakowski", email = "blazejnowakowski@gmail.com"}]
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic==2.11.0",
+    "python-dotenv==1.1.0",
+    "elevenlabs==1.55.0",
+    "groq==0.20.0",
+    "langchain==0.3.21",
+    "langchain-openai==0.3.11",
+    "langgraph==0.3.21",
+    "silero-vad==5.1.2",
+    "torch==2.6.0",
+    "numpy==2.2.4",
+    "pytest==8.3.5",
+    "pytest-asyncio==0.26.0",
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] (%(filename)s:%(lineno)s) %(message)s "
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
