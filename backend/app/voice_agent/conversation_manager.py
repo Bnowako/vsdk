@@ -5,14 +5,14 @@ from fastapi import WebSocket
 
 from app.conversation.conversation_processor import ConversationState, process
 from app.conversation.models import Conversation
-from app.sockets.twilio_client import (
+from app.voice_agent.domain import RespondToHumanResult
+from app.voice_agent.outbound_events import (
     send_mark,
     send_media,
+    send_result,
     send_stop_speaking,
-    send_to_front,
 )
-from backend.app.voice_agent.voice_agent_coordinator import respond_to_human
-from app.voice_agent.domain import RespondToHumanResult
+from app.voice_agent.voice_agent_coordinator import respond_to_human
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ async def handle_respond_to_human(conversation: Conversation, websocket: WebSock
             mark_id = conversation.agent_speech_sent(chunk)
             await send_mark(websocket, mark_id, conversation.sid)
 
-        await send_to_front(
+        await send_result(
             websocket=websocket,
             result=result,
         )

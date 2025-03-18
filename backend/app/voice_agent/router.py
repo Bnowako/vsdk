@@ -7,12 +7,12 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.audio.audio_utils import mulaw_to_pcm
 from app.conversation.models import Conversation
+from app.voice_agent.conversation_manager import audio_interpreter_loop
 from app.voice_agent.schemas import (
     MarkEvent,
     MediaEvent,
     StartEvent,
 )
-from backend.app.voice_agent.conversation_manager import audio_interpreter_loop
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

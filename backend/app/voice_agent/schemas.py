@@ -1,8 +1,7 @@
 from pydantic import BaseModel
-from typing import Optional, Union
+from typing import Literal, Union
 
 
-# ----- Start Event -----
 class StartData(BaseModel):
     streamSid: str
     accountSid: str
@@ -10,78 +9,53 @@ class StartData(BaseModel):
 
 
 class StartEvent(BaseModel):
-    event: str = "start"
+    event: Literal["start"] = "start"
     start: StartData
 
 
-# ----- Transcript Event -----
-class TranscriptEvent(BaseModel):
-    event: str = "transcript"
-    data: str
-    elapsed_time: int
-    file: Optional[str] = None
-
-
-# ----- Chat Response Event -----
-class ChatResponseData(BaseModel):
-    first_chunk_time: int
-    total_time: int
-    full_response: str
-
-
-class ChatResponseEvent(BaseModel):
-    event: str = "chat-response"
-    data: ChatResponseData
-
-
-# ----- TTS Time Event -----
-class TTSTimeData(BaseModel):
-    tts: int
-    to_first_byte: int
-    silence_to_first_audio_chunk: int
-
-
-class TTSTimeEvent(BaseModel):
-    event: str = "tts-time"
-    data: TTSTimeData
-
-
-# ----- Media Event -----
 class MediaData(BaseModel):
     payload: str
 
 
 class MediaEvent(BaseModel):
-    event: str = "media"
+    event: Literal["media"] = "media"
     media: MediaData
 
 
-# ----- Mark Event -----
 class MarkData(BaseModel):
     name: str
 
 
 class MarkEvent(BaseModel):
-    event: str = "mark"
+    event: Literal["mark"] = "mark"
     mark: MarkData
 
 
-# ----- Clear Event -----
 class ClearEvent(BaseModel):
-    event: str = "clear"
+    event: Literal["clear"] = "clear"
 
 
-# ----- Closed Event (optional) -----
 class ClosedEvent(BaseModel):
-    event: str = "closed"
+    event: Literal["closed"] = "closed"
 
 
-# ----- Union of All Event Types -----
+class CycleResult(BaseModel):
+    stt_duration: float
+    llm_duration: float
+    tts_duration: float
+    total_duration: float
+    first_chunk_time: float
+    transcript: str
+    response: str
+
+
+class ResultEvent(BaseModel):
+    event: Literal["result"] = "result"
+    result: CycleResult
+
+
 EventType = Union[
     StartEvent,
-    TranscriptEvent,
-    ChatResponseEvent,
-    TTSTimeEvent,
     MediaEvent,
     MarkEvent,
     ClearEvent,

@@ -6,6 +6,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
 </head>
 <body>
+
   <h1>Audio Stream</h1>
   <button onclick="startStream()">Start talking</button>
   <button onclick="startConversation()">Socket connect</button>
@@ -13,7 +14,7 @@
 
   <div id="conversation">
     <h2>Conversation</h2>
-    <p id="transcript"></p>
+    <!-- Messages will be appended here -->
   </div>
 
   <script>
@@ -122,27 +123,23 @@
       socket = new WebSocket(CONFIG.SOCKET_URL);
 
       socket.onopen = () => {
-        socket.send(JSON.stringify({
+        // Send StartEvent conforming to the Pydantic model
+        const startEvent = {
           event: 'start',
           start: {
             streamSid: generateId(32),
             accountSid: generateId(32),
             callSid: generateId(32)
           }
-        }));
+        };
+        socket.send(JSON.stringify(startEvent));
       };
 
       socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
         switch (data.event) {
-          case 'transcript':
-            handleTranscriptEvent(data);
-            break;
-          case 'chat-response':
-            handleChatResponseEvent(data);
-            break;
-          case 'tts-time':
-            handleTTSTimeEvent(data);
+          case 'result':
+            handleResultEvent(data);
             break;
           case 'media':
             handleMediaEvent(data);
@@ -165,6 +162,7 @@
 
     function endConversation() {
       if (socket) {
+        // Send ClosedEvent
         socket.send(JSON.stringify({ event: 'closed' }));
         socket.close();
         console.log('Disconnected');
@@ -177,7 +175,7 @@
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         console.log('Audio stream obtained:', stream);
 
-        // Create a separate AudioContext for this stream
+        // Create a dedicated AudioContext for this stream
         const localAudioContext = new (window.AudioContext || window.webkitAudioContext)({
           sampleRate: CONFIG.AUDIO_SAMPLE_RATE
         });
@@ -197,10 +195,12 @@
           const muLawBuffer = int16ToMuLaw(int16Buffer);
           const base64Buffer = btoa(String.fromCharCode.apply(null, muLawBuffer));
 
-          socket.send(JSON.stringify({
+          // Send MediaEvent conforming to the Pydantic model
+          const mediaEvent = {
             event: 'media',
             media: { payload: base64Buffer }
-          }));
+          };
+          socket.send(JSON.stringify(mediaEvent));
         };
       } catch (err) {
         console.error('Error accessing audio stream:', err);
@@ -221,10 +221,10 @@
       // Normalize PCM samples to Float32Array in range [-1, 1]
       const float32Samples = new Float32Array(pcmSamples.length);
       for (let i = 0; i < pcmSamples.length; i++) {
-        float32Samples[i] = pcmSamples[i] / 32768; // 32768 = 2^15
+        float32Samples[i] = pcmSamples[i] / 32768;
       }
 
-      // Add samples to the queue and pending chunks
+      // Enqueue audio samples for playback
       audioQueue.push(float32Samples);
       pendingAudioChunks.push({ samples: float32Samples, markId: null });
     }
@@ -262,7 +262,7 @@
     }
 
     function playAudio(float32Samples, callback) {
-      console.log(`Playing audio chunk - ${float32Samples.length} samples`, float32Samples);
+      console.log(`Playing audio chunk - ${float32Samples.length} samples`);
       const buffer = audioContext.createBuffer(1, float32Samples.length, CONFIG.AUDIO_SAMPLE_RATE);
       buffer.copyToChannel(float32Samples, 0);
 
@@ -274,19 +274,17 @@
     }
 
     function sendMarkEventToServer(markId) {
-      const message = {
+      // Send MarkEvent conforming to the Pydantic model (without extra properties)
+      const markEvent = {
         event: 'mark',
-        streamSid: '',
         mark: { name: markId }
       };
-      socket.send(JSON.stringify(message));
+      socket.send(JSON.stringify(markEvent));
     }
 
     function stopAudio() {
-      // Clear any pending audio chunks
+      // Clear pending audio chunks
       pendingAudioChunks = [];
-
-      // Close and reinitialize the AudioContext if needed
       if (audioContext && audioContext.state !== 'closed') {
         audioContext.close().then(() => {
           audioContext = new (window.AudioContext || window.webkitAudioContext)({
@@ -298,48 +296,21 @@
       console.log('Audio stopped');
     }
 
-    /***** Event Handlers *****/
-    function handleTranscriptEvent(data) {
-      console.log('Transcript:', data.data);
-      const p = document.createElement('p');
-      p.innerHTML = `<span class="message-time">${data.elapsed_time}ms</span> Human: ${data.data}`;
-      p.id = "human-message";
-
-      if (data.file) {
-        const audioBlob = new Blob(
-          [Uint8Array.from(atob(data.file), c => c.charCodeAt(0))],
-          { type: 'audio/wav' }
-        );
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audioElement = document.createElement('audio');
-        audioElement.controls = true;
-        audioElement.src = audioUrl;
-        p.appendChild(audioElement);
-      }
-      document.getElementById('conversation').appendChild(p);
-    }
-
-    function handleChatResponseEvent(data) {
-      const chatResponse = data.data;
+    /***** Incoming Result Event Handler *****/
+    function handleResultEvent(data) {
+      // data.result contains: stt_duration, llm_duration, tts_duration, total_duration, first_chunk_time, transcript, response
+      const result = data.result;
       const p = document.createElement('p');
       p.innerHTML = `
-        First Chunk: <span class="message-time">${chatResponse.first_chunk_time}ms</span>
-        Total time: <span class="message-time">${chatResponse.total_time}ms</span>
-        Agent: ${chatResponse.full_response}
+        <span class="message-time">STT: ${result.stt_duration}ms</span>
+        <span class="message-time">LLM: ${result.llm_duration}ms</span>
+        <span class="message-time">TTS: ${result.tts_duration}ms</span>
+        <span class="message-time">Total: ${result.total_duration}ms</span>
+        <span class="message-time">First Chunk: ${result.first_chunk_time}ms</span>
+        <strong>Transcript:</strong> ${result.transcript} <br>
+        <strong>Response:</strong> ${result.response}
       `;
-      p.id = "chat-message";
-      document.getElementById('conversation').appendChild(p);
-    }
-
-    function handleTTSTimeEvent(data) {
-      const ttsStats = data.data;
-      const p = document.createElement('p');
-      p.innerHTML = `
-        TTS: <span class="message-time">${ttsStats.tts}ms</span>
-        First Chunk: <span class="message-time">${ttsStats.to_first_byte}ms</span>
-        Silence to First Chunk: <span class="message-time">${ttsStats.silence_to_first_audio_chunk}ms</span>
-      `;
-      p.id = "started-speaking";
+      p.id = "result-message";
       document.getElementById('conversation').appendChild(p);
     }
 
@@ -353,7 +324,6 @@
         if (chunk.markId !== null) {
           sendMarkEventToServer(chunk.markId);
         } else {
-          // Generate a temporary markId if none exists
           const tempMarkId = generateId(10);
           chunk.markId = tempMarkId;
           sendMarkEventToServer(tempMarkId);
@@ -364,88 +334,74 @@
   </script>
 </body>
 
+
 <head>
-    <style>
-        /* CSS remains unchanged */
-        body {
-          font-family: Arial, sans-serif;
-          background-color: #f4f4f9;
-          margin: 0;
-          padding: 0;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          height: 100vh;
-        }
+  <style>
+    /* CSS remains unchanged */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
 
-        h1 {
-          color: #333;
-        }
+    h1 {
+      color: #333;
+    }
 
-        #conversation {
-          width: 80%;
-          max-width: 600px;
-          background: #fff;
-          border-radius: 8px;
-          box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-          overflow-y: auto;
-          padding: 20px;
-          margin-top: 20px;
-          height: 60vh;
-        }
+    #conversation {
+      width: 80%;
+      max-width: 600px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      overflow-y: auto;
+      padding: 20px;
+      margin-top: 20px;
+      height: 60vh;
+    }
 
-        #conversation h2 {
-          margin-top: 0;
-        }
+    #conversation h2 {
+      margin-top: 0;
+    }
 
-        #conversation p {
-          padding: 10px;
-          border-radius: 5px;
-          margin: 10px 0;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
+    #conversation p {
+      padding: 10px;
+      border-radius: 5px;
+      margin: 10px 0;
+      display: flex;
+      flex-direction: column;
+    }
 
-        #human-message {
-          background-color: #d1e7dd;
-          align-self: flex-start;
-        }
+    .message-time {
+      font-size: 0.8em;
+      color: #888;
+      margin-bottom: 5px;
+      background-color: #e0e0e0;
+      border-radius: 12px;
+      padding: 2px 8px;
+      display: inline-block;
+    }
 
-        #chat-message {
-          background-color: #f8d7da;
-          align-self: flex-end;
-        }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
 
-        #started-speaking {
-          background-color: #007bff;
-          align-self: flex-end;
-        }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
 
-        .message-time {
-          font-size: 0.8em;
-          color: #888;
-          margin-left: 10px;
-          background-color: #e0e0e0;
-          border-radius: 12px;
-          padding: 2px 8px;
-        }
-
-        button {
-          background-color: #007bff;
-          color: white;
-          border: none;
-          padding: 10px 20px;
-          margin: 5px;
-          border-radius: 5px;
-          cursor: pointer;
-        }
-
-        button:hover {
-          background-color: #0056b3;
-        }
-      </style>
 </head>
-
 </html>

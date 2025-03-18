@@ -12,7 +12,7 @@ from app.voice_agent.domain import (
     TTSResult,
 )
 from app.voice_agent.language_agent import LLMAgent
-from backend.app.voice_agent.text_voice_interface import TextVoiceInterface
+from app.voice_agent.text_voice_interface import TextVoiceInterface
 
 logger = logging.getLogger(__name__)
 
