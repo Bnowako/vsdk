@@ -132,10 +132,10 @@ class Conversation:
         # Audio IN
         # TODO extract all of those to separate class HumanSpeech
         # this class should be responsible for managing human speech and be aware of the current state of each speech
-        self.pcm_audio_buffer = b""
-        self.new_pcm_audio = b""
-        self.last_human_speech = b""
-        self.human_speech_without_response = b""
+        self.pcm_audio_buffer: bytes = b""
+        self.new_pcm_audio: bytes = b""
+        self.last_human_speech: bytes = b""
+        self.human_speech_without_response: bytes = b""
 
         # Thinking
         self.agent_response_tasks: List[AgentResponseTask] = []
@@ -143,10 +143,10 @@ class Conversation:
         # Audio OUT
         self.agent_voice = AgentVoice(sid)
 
-        self.audio_interpreter_loop: Task | None = None
+        self.audio_interpreter_loop: Task[None] | None = None
 
     # Human Voice
-    def audio_received(self, pcm_audio):
+    def audio_received(self, pcm_audio: bytes) -> None:
         self.new_pcm_audio += pcm_audio
         self.pcm_audio_buffer += pcm_audio
         logger.debug(
@@ -229,7 +229,7 @@ class Conversation:
 
     # Thinking
 
-    def add_agent_response_task(self, task: Task):
+    def add_agent_response_task(self, task: Task[None]):
         logger.debug("🧠 Adding agent response task.")
         self.agent_response_tasks.append(
             AgentResponseTask(

@@ -2,9 +2,10 @@ import asyncio
 import base64
 import json
 import logging
+from typing import Any, Dict
 
 from fastapi import Request, WebSocket, WebSocketDisconnect
-from fastapi.templating import Jinja2Templates
+from starlette.templating import Jinja2Templates
 
 from app.agents.agent_coordinator import respond_to_human
 from app.audio.audio_utils import mulaw_to_pcm
@@ -44,15 +45,12 @@ async def websocket_endpoint(websocket: WebSocket):
     logger.info("Connection accepted")
 
     sid = ""
-    conversation = None
+    conversation: Conversation | None = None
     try:
         while True:
             try:
                 message = await websocket.receive_text()
 
-                if message is None:
-                    logger.info("No message received...")
-                    continue
                 data = json.loads(message)
                 if data["event"] == "connected":
                     logger.info(f"Connected Message received {message}")
@@ -67,6 +65,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     conversation.audio_interpreter_loop = task
 
                 elif data["event"] == "media":
+                    if conversation is None:
+                        logger.error("Conversation not found")
+                        raise ValueError("Conversation not found")
+
                     base64_payload = data["media"]["payload"]
                     decoded_audio = base64.b64decode(base64_payload)
                     pcm_audio = mulaw_to_pcm(decoded_audio)
@@ -75,6 +77,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     logger.info(f"Closed Message received {message}")
                     break
                 elif data["event"] == "mark":
+                    if conversation is None:
+                        logger.error("Conversation not found")
+                        raise ValueError("Conversation not found")
+
                     logger.debug(f"Mark Message received {message}")
                     chunk_idx = data["mark"]["name"].split("_")[-1]
                     speech_idx = data["mark"]["name"].split("_")[-2]
@@ -86,6 +92,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 break
     finally:
         logger.info(f"Cleaning up for sid: {sid}")
+        if conversation is None:
+            raise ValueError("Conversation not found")
         conversation.end_conversation()
         if sid in conversations_cache:
             del conversations_cache[sid]  # todo make sure this is collected by GC
@@ -140,12 +148,12 @@ async def audio_interpreter_loop(conversation: Conversation, websocket: WebSocke
 
 async def handle_respond_to_human(conversation: Conversation, websocket: WebSocket):
     try:
-        result = {}
+        result: Dict[str, Any] = {}
         conversation.new_agent_speech_start()
         async for chunk in respond_to_human(
-            conversation.human_speech_without_response,
-            conversation.sid,
-            lambda x: result.update(x),
+            pcm_audio_buffer=conversation.human_speech_without_response,
+            sid=conversation.sid,
+            callback=lambda x: result.update(x),
         ):
             await send_media(chunk, websocket, conversation.sid)
             mark_id = conversation.agent_speech_sent(chunk)
@@ -154,7 +162,7 @@ async def handle_respond_to_human(conversation: Conversation, websocket: WebSock
         if LOCAL:
             await send_to_front(
                 websocket=websocket,
-                transcript=result["transcript"],
+                transcript=result["transcript"]["text"],
                 stt_time=result["stt_time"],
                 bytes_data=result["human_speech_wav"],
                 llm_stats=result["llm_result"],
@@ -164,7 +172,7 @@ async def handle_respond_to_human(conversation: Conversation, websocket: WebSock
         logger.error(f"Exception in handle_respond_to_human: {e}")
 
 
-async def restream_audio(websocket, conversation: Conversation):
+async def restream_audio(websocket: WebSocket, conversation: Conversation):
     try:
         logger.info(
             "Resending audio. All chunks: "  # todo add more logs

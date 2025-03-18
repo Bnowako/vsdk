@@ -12,24 +12,24 @@ async def send_media(bytez: bytes, websocket: WebSocket, sid: str):
     await websocket.send_text(json.dumps(msg))
 
 
-async def send_mark(websocket, mark_id, sid):
+async def send_mark(websocket: WebSocket, mark_id: str, sid: str):
     msg = {"event": "mark", "streamSid": sid, "mark": {"name": str(mark_id)}}
     await websocket.send_text(json.dumps(msg))
 
 
 async def send_to_front(
     websocket: WebSocket,
-    transcript,
-    stt_time,
-    bytes_data,
-    llm_stats,
-    tts_stats,
+    transcript: str,
+    stt_time: float,
+    bytes_data: bytes,
+    llm_stats: str,
+    tts_stats: str,
 ):
     await websocket.send_text(
         json.dumps(
             {
                 "event": "transcript",
-                "data": transcript.text,
+                "data": transcript,
                 "elapsed_time": stt_time,
                 "file": base64.b64encode(bytes_data).decode("utf-8"),
             }

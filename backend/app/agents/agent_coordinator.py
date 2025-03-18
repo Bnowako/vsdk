@@ -1,4 +1,4 @@
-from typing import Generator
+from typing import Any, AsyncGenerator, Dict
 
 import logging
 from collections.abc import Callable
@@ -20,8 +20,8 @@ agent = LLMAgent(
 
 
 async def respond_to_human(
-    pcm_audio_buffer: bytes, sid: str, callback: Callable
-) -> Generator[bytes, None, None]:
+    pcm_audio_buffer: bytes, sid: str, callback: Callable[[Dict[str, Any]], None]
+) -> AsyncGenerator[bytes, None]:
     logger.info(
         f"Human speach detected, triggering response flow. PCM buffer duration {len(pcm_audio_buffer) // Config.Audio.bytes_per_sample / Config.Audio.sample_rate}s"
     )
