@@ -180,15 +180,54 @@
     .metrics-table tr:last-child td {
       border-bottom: none;
     }
+
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 50px;
+      background: var(--secondary-color);
+      margin-bottom: 1rem;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #ccc;
+    }
+
+    .status-dot.connected {
+      background-color: #28a745;
+    }
+
+    .status-dot.disconnected {
+      background-color: #dc3545;
+    }
+
+    button#talkButton.listening {
+      background-color: #28a745;
+      animation: pulse 2s infinite;
+    }
+
+    button#talkButton.connecting {
+      background-color: #ffc107;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Voice Assistant</h1>
 
+    <div class="status-indicator">
+      <div id="wsStatus" class="status-dot disconnected"></div>
+      <span id="wsStatusText">Disconnected</span>
+    </div>
+
     <div class="controls">
-      <button id="talkButton" onclick="startStream()">
-        Start Talking
+      <button id="talkButton" onclick="toggleTalking()">
+        Talk to AI Assistant
       </button>
       <button onclick="startConversation()">Connect</button>
       <button onclick="endConversation()">Disconnect</button>
@@ -302,10 +341,20 @@
     }
 
     /***** WebSocket Functions *****/
+    function updateConnectionStatus(status, text) {
+      const statusDot = document.getElementById('wsStatus');
+      const statusText = document.getElementById('wsStatusText');
+
+      statusDot.className = `status-dot ${status}`;
+      statusText.textContent = text;
+    }
+
     function startConversation() {
+      updateConnectionStatus('connecting', 'Connecting...');
       socket = new WebSocket(CONFIG.SOCKET_URL);
 
       socket.onopen = () => {
+        updateConnectionStatus('connected', 'Connected');
         // Send StartEvent conforming to the Pydantic model
         const startEvent = {
           event: 'start',
@@ -339,18 +388,19 @@
       };
 
       socket.onclose = () => {
+        updateConnectionStatus('disconnected', 'Disconnected');
         console.log('Disconnected');
       };
     }
 
     function endConversation() {
       const button = document.getElementById('talkButton');
-      button.classList.remove('recording');
-      button.textContent = 'Start Talking';
+      button.classList.remove('listening');
+      button.textContent = 'Talk to AI Assistant';
+      updateConnectionStatus('disconnected', 'Disconnected');
       if (socket) {
         socket.send(JSON.stringify({ event: 'closed' }));
         socket.close();
-        console.log('Disconnected');
       }
     }
 
@@ -358,7 +408,7 @@
     async function startStream() {
       const button = document.getElementById('talkButton');
       button.classList.add('recording');
-      button.textContent = 'Recording...';
+      button.textContent = 'Online...';
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         console.log('Audio stream obtained:', stream);
@@ -542,6 +592,25 @@
         }
       });
       pendingAudioChunks = [];
+    }
+
+    function toggleTalking() {
+      const button = document.getElementById('talkButton');
+
+      if (button.classList.contains('listening')) {
+        // Stop listening
+        button.classList.remove('listening');
+        button.textContent = 'Talk to AI Assistant';
+        endConversation();
+      } else {
+        // Start listening
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+          startConversation();
+        }
+        button.classList.add('listening');
+        button.textContent = 'Listening...';
+        startStream();
+      }
     }
   </script>
 </body>
