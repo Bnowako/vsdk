@@ -2,7 +2,7 @@ from enum import Enum
 
 import logging
 
-from app.audio.vad import silero_iterator
+from app.audio.vad import VADResult, silero_iterator
 from app.config import Config
 from app.conversation.models import Conversation
 
@@ -27,7 +27,7 @@ def process(conversation: Conversation):
 
     if speech_result.ended:
         logger.info(
-            f"Human speach ended. Speach length: {speech_result.end_sample - speech_result.start_sample}. "  # todo add more to his log
+            f"Human speach ended. Speach length: {speech_result.end_sample or 0 - speech_result.start_sample}. "  # todo add more to his log
         )
 
         conversation.human_speech_ended(speech_result)
@@ -59,7 +59,7 @@ def process(conversation: Conversation):
             return ConversationState.HUMAN_STARTED_SPEAKING
 
 
-def check_for_speech(conversation: Conversation):
+def check_for_speech(conversation: Conversation) -> VADResult | None:
     data_to_process = conversation.get_data_to_process_and_clear()
     if (
         len(data_to_process)

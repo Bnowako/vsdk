@@ -39,7 +39,7 @@ vad_iterator_dict = {}
 vad_speech_dict = {}
 
 
-def silero_iterator(pcm_audio: bytes, sid: str) -> VADResult:
+def silero_iterator(pcm_audio: bytes, sid: str) -> VADResult | None:
     # Silero vad works on fixed sample sizes. Most comonly  512 if sampling_rate == 16000 else 256
     # So in our case (Twilio sends us 8KHz audio) it will be 256 samples
     # This corresponds to 32ms of data 256 samples for 8000 samples/second (256 samples/8000 sample rate* 1 second * 1000 ms)
@@ -99,3 +99,5 @@ def silero_iterator(pcm_audio: bytes, sid: str) -> VADResult:
             speech_dict.clear()
 
         return vad_result
+    else:
+        return None
