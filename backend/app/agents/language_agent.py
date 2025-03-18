@@ -3,8 +3,7 @@ Langchain agent
 """
 
 import logging
-from abc import ABC
-from typing import Callable, Optional, List
+from typing import Any, AsyncGenerator, Callable, Dict, Optional, List
 
 import time
 from langchain.chat_models.base import BaseChatModel
@@ -28,23 +27,8 @@ def what_day_and_time_is_it():
     return time.strftime("%A %H:%M:%S", time.localtime())
 
 
-class Agent(ABC):
-    async def ask(self, user_query: str, conversation_id: str) -> str:
-        pass
-
-    async def astream(
-        self,
-        user_query: str,
-        conversation_id: str,
-        callback: Optional[Callable[[dict], None]] = None,
-    ):
-        pass
-
-
-class LLMAgent(Agent):
+class LLMAgent:
     def __init__(self, llm: BaseChatModel, system_prompt: str) -> None:
-        self.saver = None
-        self.agent = None
         self.llm = llm
         self.system_prompt = system_prompt
         logger.info("Initializing LLMAgent")
@@ -71,15 +55,15 @@ class LLMAgent(Agent):
         self,
         user_query: str,
         conversation_id: str,
-        callback: Optional[Callable[[dict], None]] = None,
-    ):
+        callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> AsyncGenerator[str, None]:
         logger.error("Starting astream")
 
         start_time = time.time()
         first_chunk_time = None
         full_response = ""
 
-        async for msg, metadata in self.agent.astream(
+        async for msg, _ in self.agent.astream(
             stream_mode="messages",
             input={"messages": [HumanMessage(content=user_query)]},
             config={"configurable": {"thread_id": conversation_id}},
@@ -90,7 +74,7 @@ class LLMAgent(Agent):
                     first_chunk_time = time.time() - start_time
 
                 # Accumulate the full response
-                content = msg.content
+                content: str = msg.content  # type: ignore
                 full_response += content
 
                 # Yield the content chunk
@@ -104,16 +88,18 @@ class LLMAgent(Agent):
             callback(
                 {
                     "full_response": full_response,
-                    "first_chunk_time": first_chunk_time * 1000,
+                    "first_chunk_time": first_chunk_time * 1000
+                    if first_chunk_time
+                    else None,
                     "total_time": total_time * 1000,
                 }
             )
 
     async def adebug_ask(
-        self, messages: list, conversation_id: str
+        self, messages: list[BaseMessage], conversation_id: str
     ) -> List[BaseMessage]:
         response = self.agent.ainvoke(
             input={"messages": messages},
             config={"configurable": {"thread_id": conversation_id}},
         )
-        return await response
+        return await response  # type: ignore

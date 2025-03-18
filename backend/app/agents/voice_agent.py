@@ -4,7 +4,7 @@ import dataclasses
 import json
 import wave
 from io import BytesIO
-from typing import Iterator, AsyncGenerator, List, Tuple, Optional
+from typing import AsyncGenerator, Iterator, List, Optional, Tuple
 
 import websockets
 from groq.types.audio import Transcription
@@ -32,7 +32,7 @@ def calculate_word_start_times(
         zip(full_alignment.chars, full_alignment.charStartTimesMs)
     )
 
-    start_times = []
+    start_times: List[Tuple[str, int]] = []
     for i, (char, start_time) in enumerate(zipped_start_times):
         if i != 0 and zipped_start_times[i - 1][0] == " ":
             start_times.append((char, start_time))
@@ -64,12 +64,17 @@ def split_by_words_or_by_fixed_interval_if_silence(audio_chunk: AudioChunk):
 # todo THIS FAILS REALLY QUIETLY IF THERE ARE SOME ISSUES WITH ELEVEN API, FIX THIS!!!!
 # to reproduce for example break api key
 class VoiceAgent:
-    def __init__(self, eleven=Config.Eleven, groq=Config.Groq, async_groq=Config.Groq):
+    def __init__(
+        self,
+        eleven: Config.Eleven = Config.Eleven(),
+        groq: Config.Groq = Config.Groq(),
+        async_groq: Config.Groq = Config.Groq(),
+    ):
         self.eleven = eleven
         self.groq = groq
         self.async_groq = async_groq
 
-    async def speech_to_text(self, pcm_audio: bytes) -> (Transcription, bytes):
+    async def speech_to_text(self, pcm_audio: bytes) -> tuple[Transcription, bytes]:
         wav_io = BytesIO()
         with wave.open(wav_io, "wb") as wav_file:
             wav_file.setnchannels(Config.Audio.channels)
@@ -99,8 +104,8 @@ class VoiceAgent:
 
     async def text_to_speech_streaming_ws(
         self, input_generator: AsyncGenerator[str, None]
-    ):
-        audio_queue = asyncio.Queue()
+    ) -> AsyncGenerator[bytes, None]:
+        audio_queue: asyncio.Queue[AudioChunk | None] = asyncio.Queue()
 
         async def send_and_listen():
             uri = f"wss://api.elevenlabs.io/v1/text-to-speech/{self.eleven.voice}/stream-input?model_id=eleven_turbo_v2_5&output_format=ulaw_8000&language_code=pl"

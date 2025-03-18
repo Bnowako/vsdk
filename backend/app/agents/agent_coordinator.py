@@ -35,20 +35,19 @@ async def respond_to_human(
     logger.info(
         f"STT time: {(stt_end - stt_start) * 1000} Transcript: {transcript.text}"
     )
-    llm_result = {}
+
+    llm_result: Dict[str, Any] = {}
     output_llm_stream = agent.astream(
         user_query=transcript.text,
         conversation_id=sid,
         callback=lambda x: llm_result.update(x),
     )
-    # create mock output llm stream
-
-    # logger.info(f"Output LLM stream: {output_llm_stream}")
 
     voice_stream = voice_assistant.text_to_speech_streaming_ws(output_llm_stream)
 
     start_tts = time.time()
     first_chunk = True
+    first_chunk_time = None
     try:
         async for chunk in voice_stream:
             if first_chunk:
@@ -59,12 +58,16 @@ async def respond_to_human(
         logger.error(f"Exception in agent response: {e}")
 
     end_tts = time.time()
-    tts_stats = {
+    tts_stats: Dict[str, Any] = {
         "tts": math.ceil((end_tts - start_tts) * 1000),
-        "to_first_byte": math.ceil((first_chunk_time - start_tts) * 1000),
+        "to_first_byte": math.ceil((first_chunk_time - start_tts) * 1000)
+        if first_chunk_time
+        else None,
         "silence_to_first_audio_chunk": math.ceil(
             (first_chunk_time - start_processing) * 1000
-        ),
+        )
+        if first_chunk_time
+        else None,
     }
     logger.info("LLM reulsts: %s", llm_result)
     logger.info("TTS results: %s", tts_stats)
