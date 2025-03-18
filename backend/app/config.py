@@ -9,15 +9,8 @@ from dotenv import load_dotenv
 from .example.router import router as example_router
 from .example.models import ExampleDocument
 from elevenlabs import ElevenLabs
-import logging
-import os
-from typing import Literal
 
-from dotenv import load_dotenv
-from elevenlabs import ElevenLabs
 from groq import AsyncGroq
-from langchain.chat_models.base import BaseChatModel
-from langchain_groq import ChatGroq
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

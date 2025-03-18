@@ -4,12 +4,7 @@ from fastapi import Request
 import asyncio
 import base64
 import json
-from fastapi import WebSocket, WebSocketDisconnect, Request
-from fastapi.responses import Response
-from fastapi.templating import Jinja2Templates
-from starlette.responses import StreamingResponse
-from pydantic import BaseModel
-from app.agents.agent_coordinator import agent
+from fastapi import WebSocket, WebSocketDisconnect
 from app.agents.agent_coordinator import respond_to_human
 from app.audio.audio_utils import mulaw_to_pcm
 from app.conversation.conversation_processor import process, ConversationState
@@ -24,6 +19,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+
+LOCAL = True
 
 app = create_app()
 

@@ -1,4 +1,3 @@
-import asyncio
 from typing import Generator
 
 import logging

@@ -1,23 +1,18 @@
 """
 Langchain agent
 """
-import asyncio
 import logging
-import os
 from abc import ABC
 from typing import Callable, Optional, List
 
 import time
 from langchain.chat_models.base import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessageChunk, BaseMessage
-from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 
-import requests
 
-from app.config import Config
 
 logger = logging.getLogger(__name__)
 
