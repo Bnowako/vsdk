@@ -5,7 +5,7 @@ import motor.motor_asyncio
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
-from app.voice_agent.router import router as voice_agent_router
+from app.twilio.router import router as twilio_router
 from app.config import Config
 
 logging.basicConfig(level=logging.INFO)
@@ -38,7 +38,7 @@ async def db_lifespan(app: MongoFastAPI):
 
 def create_app() -> FastAPI:
     app = MongoFastAPI(lifespan=db_lifespan, openapi_prefix="/api")  # type: ignore
-    app.include_router(voice_agent_router)
+    app.include_router(twilio_router)
 
     app.add_middleware(
         CORSMiddleware,

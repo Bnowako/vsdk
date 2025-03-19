@@ -2,27 +2,34 @@ import base64
 import json
 import logging
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
+from starlette.templating import Jinja2Templates
 
 from app.audio.audio_utils import mulaw_to_pcm
+from app.twilio.schemas import (
+    ClearEventWS,
+    CustomResultEvent,
+    CycleResult,
+    MarkData,
+    MediaData,
+    TwilioMarkEvent,
+    TwilioMediaEvent,
+    TwilioStartEvent,
+)
 from app.voice_agent.conversation.domain import ConversationEvent
 from app.voice_agent.conversation_container import ConversationContainer
 from app.voice_agent.domain import RespondToHumanResult
-from app.voice_agent.schemas import (
-    ClearEventWS,
-    CycleResult,
-    MarkData,
-    MarkEventWS,
-    MediaData,
-    MediaEventWS,
-    ResultEventWS,
-    StartEventWS,
-)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-router = APIRouter(tags=["voice_agent"])
+router = APIRouter(prefix="/twilio", tags=["twilio"])
+templates = Jinja2Templates(directory="templates")
+
+
+@router.get("/")
+async def index(request: Request):
+    return templates.TemplateResponse("twilio.html", {"request": request})
 
 
 @router.websocket("/ws")
@@ -50,7 +57,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 if event_type == "connected":
                     logger.info(f"Connected Message received {message}")
                 elif event_type == "start":
-                    start_event = StartEventWS(**data)
+                    start_event = TwilioStartEvent(**data)
                     sid = start_event.start.streamSid
 
                     # initialize conversation container
@@ -62,7 +69,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         callback=conversation_events_handler,
                     )
                 elif event_type == "media" and conversation_container:
-                    media_event = MediaEventWS(**data)
+                    media_event = TwilioMediaEvent(**data)
                     decoded_audio = base64.b64decode(media_event.media.payload)
                     pcm_audio = mulaw_to_pcm(decoded_audio)
 
@@ -71,7 +78,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     logger.info(f"Closed Message received {message}")
                     break
                 elif event_type == "mark" and conversation_container:
-                    mark_event = MarkEventWS(**data)
+                    mark_event = TwilioMarkEvent(**data)
                     chunk_idx = mark_event.mark.name.split("_")[-1]
                     speech_idx = mark_event.mark.name.split("_")[-2]
                     logger.debug(f"Mark Message received {message}")
@@ -98,29 +105,30 @@ async def handle_conversation_event(event: ConversationEvent, websocket: WebSock
             await send_stop_speaking(websocket)
 
         case "media":
-            await send_media(event.audio, websocket, event.sid)
+            await send_media(event.audio, websocket)
 
         case "mark":
-            await send_mark(websocket, event.mark_id, event.sid)
+            await send_mark(websocket, event.mark_id)
 
         case "result":
             await send_result(websocket, event.result)
 
-        case "start_restream" | "start_responding":
+        case _:
             # These events don't need to send anything to websocket
+            logger.warning(f"Unknown event type: {event.type}")
             pass
 
 
-async def send_media(bytez: bytes, websocket: WebSocket, sid: str):
+async def send_media(bytez: bytes, websocket: WebSocket):
     media_base64 = base64.b64encode(bytez).decode("utf-8")
-    event = MediaEventWS(
+    event = TwilioMediaEvent(
         media=MediaData(payload=media_base64),
     )
     await websocket.send_text(event.model_dump_json())
 
 
-async def send_mark(websocket: WebSocket, mark_id: str, sid: str):
-    event = MarkEventWS(
+async def send_mark(websocket: WebSocket, mark_id: str):
+    event = TwilioMarkEvent(
         mark=MarkData(name=str(mark_id)),
     )
     await websocket.send_text(event.model_dump_json())
@@ -131,7 +139,7 @@ async def send_result(
     result: RespondToHumanResult,
 ):
     await websocket.send_text(
-        ResultEventWS(
+        CustomResultEvent(
             result=CycleResult(
                 stt_duration=result.stt_result.stt_end_time
                 - result.stt_result.stt_start_time,
