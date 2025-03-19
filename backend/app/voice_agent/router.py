@@ -102,8 +102,6 @@ async def websocket_endpoint(websocket: WebSocket):
                     conversation.agent_speech_marked(
                         speech_idx=int(speech_idx), chunk_idx=int(chunk_idx)
                     )
-                elif event_type == "pageContent":
-                    print("Page content", data)
             except WebSocketDisconnect:
                 logger.info("WebSocket disconnected")
                 break
