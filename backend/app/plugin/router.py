@@ -74,3 +74,22 @@ async def websocket_endpoint(websocket: WebSocket):
 async def handle_conversation_event(event: ConversationEvent, websocket: WebSocket):
     logger.info(f"🎭 Callback received: {event.type}")
     await websocket.send_text(event.model_dump_json())
+
+
+@router.websocket("/chat/ws")
+async def chat_endpoint(websocket: WebSocket):
+    logger.info("Connection requested")
+    await websocket.accept()
+    logger.info("Connection accepted")
+
+    try:
+        while True:
+            try:
+                message = await websocket.receive_text()
+                logger.info(f"Message received: {message}")
+                await websocket.send_text(json.dumps({"content": "Hej"}))
+            except WebSocketDisconnect:
+                logger.info("WebSocket disconnected")
+                break
+    finally:
+        logger.info("Connection closed.")
