@@ -6,7 +6,7 @@ from fastapi import WebSocket
 from app.conversation.conversation_processor import ConversationState, process
 from app.conversation.models import Conversation
 from app.voice_agent.domain import RespondToHumanResult
-from app.voice_agent.outbound_events import (
+from app.voice_agent.router import (
     send_mark,
     send_media,
     send_result,
