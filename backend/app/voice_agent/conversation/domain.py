@@ -34,7 +34,6 @@ class StartRespondingEvent(BaseModel):
     type: Literal["start_responding"] = "start_responding"
 
 
-# Union type for all possible events
 ConversationEvent = Union[
     StopSpeakingEvent,
     MediaEvent,

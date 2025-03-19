@@ -30,7 +30,6 @@ from app.voice_agent.voice_agent import VoiceAgent
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-conversations_cache = {}
 
 router = APIRouter(tags=["voice_agent"])
 
@@ -66,7 +65,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
                     sid = start_event.start.streamSid
                     conversation = Conversation(sid=sid)
-                    conversations_cache[sid] = conversation
 
                     async def conversation_events_handler(x: ConversationEvent):
                         await handle_conversation_event(x, websocket)
@@ -104,6 +102,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     conversation.agent_speech_marked(
                         speech_idx=int(speech_idx), chunk_idx=int(chunk_idx)
                     )
+                elif event_type == "pageContent":
+                    print("Page content", data)
             except WebSocketDisconnect:
                 logger.info("WebSocket disconnected")
                 break
@@ -112,10 +112,7 @@ async def websocket_endpoint(websocket: WebSocket):
         if conversation is None:
             raise ValueError("Conversation not found")
         conversation.end_conversation()
-        if sid in conversations_cache:
-            del conversations_cache[sid]  # todo make sure this is collected by GC
-        else:
-            logger.error(f"Conversation not found in cache: {sid}")
+
     logger.info("Connection closed.")
 
 
