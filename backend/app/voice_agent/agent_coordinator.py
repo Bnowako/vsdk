@@ -7,12 +7,12 @@ from langchain_openai import ChatOpenAI
 
 from app.config import Config
 from app.voice_agent.domain import (
-    LLMResult,
     RespondToHumanResult,
     TTSResult,
 )
 from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
 from app.voice_agent.text_voice_interface import TextVoiceInterface
+from app.voice_agent.ttt.domain import LLMResult
 from app.voice_agent.ttt.OpenAIAgent import OpenAIAgent
 
 logger = logging.getLogger(__name__)
