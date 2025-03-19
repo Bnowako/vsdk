@@ -36,7 +36,7 @@ async def respond_to_human(
     logger.info("STT results: %s", stt_result)
 
     llm_result = LLMResult.empty()
-    output_llm_stream = agent.astream(
+    output_llm_stream = agent(
         stt_result,
         conversation_id=sid,
         callback=lambda x: llm_result.update(x),

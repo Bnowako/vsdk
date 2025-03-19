@@ -3,22 +3,21 @@ Langchain agent
 """
 
 import logging
-from typing import AsyncGenerator, Callable, Optional, List
-
 import time
+from typing import AsyncGenerator, Callable, List, Optional
+
 from langchain.chat_models.base import BaseChatModel
 from langchain_core.messages import (
-    HumanMessage,
-    SystemMessage,
     AIMessageChunk,
     BaseMessage,
+    HumanMessage,
+    SystemMessage,
 )
 from langchain_core.tools import tool
-from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.prebuilt import create_react_agent
 
 from app.voice_agent.domain import LLMResult, STTResult
-
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ def what_day_and_time_is_it():
     return time.strftime("%A %H:%M:%S", time.localtime())
 
 
-class LLMAgent:
+class OpenAIAgent:
     def __init__(self, llm: BaseChatModel, system_prompt: str) -> None:
         self.llm = llm
         self.system_prompt = system_prompt
@@ -42,16 +41,13 @@ class LLMAgent:
             tools=[what_day_and_time_is_it],
         )
 
-    async def ask(
-        self, user_query: str, conversation_id: str, call_sid: Optional[str] = None
-    ) -> str:
-        response = await self.agent.ainvoke(
-            input={"messages": [HumanMessage(content=user_query)]},
-            config={
-                "configurable": {"thread_id": conversation_id, "call_sid": call_sid}
-            },
-        )
-        return response["messages"][-1].content
+    def __call__(
+        self,
+        stt_result: STTResult,
+        conversation_id: str,
+        callback: Optional[Callable[[LLMResult], None]] = None,
+    ) -> AsyncGenerator[str, None]:
+        return self.astream(stt_result, conversation_id, callback)
 
     async def astream(
         self,
@@ -92,6 +88,17 @@ class LLMAgent:
                     response=full_response,
                 )
             )
+
+    async def ask(
+        self, user_query: str, conversation_id: str, call_sid: Optional[str] = None
+    ) -> str:
+        response = await self.agent.ainvoke(
+            input={"messages": [HumanMessage(content=user_query)]},
+            config={
+                "configurable": {"thread_id": conversation_id, "call_sid": call_sid}
+            },
+        )
+        return response["messages"][-1].content
 
     async def adebug_ask(
         self, messages: list[BaseMessage], conversation_id: str
