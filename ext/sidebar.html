@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AI Assistant Sidebar</title>
+  <link rel="stylesheet" href="popup.css">
+  <style>
+    /* Sidebar-specific styles */
+    body {
+      min-width: auto;
+      margin: 0;
+      padding: 12px;
+    }
+
+    .container {
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>AI Assistant</h1>
+
+    <div class="status-indicator">
+      <div id="wsStatus" class="status-dot disconnected"></div>
+      <span id="wsStatusText">Disconnected</span>
+    </div>
+
+    <div class="controls">
+      <button id="talkButton">Talk to AI Assistant</button>
+      <button id="connectButton">Connect</button>
+      <button id="disconnectButton">Disconnect</button>
+    </div>
+
+    <div id="conversation">
+      <h2>Conversation History</h2>
+      <!-- Initial instructions -->
+      <div class="message info">
+        <div class="message-content">
+          <div class="info-message">
+            <strong>Getting Started:</strong>
+            <ol>
+              <li>Click "Connect" to connect to the server</li>
+              <li>Click "Talk to AI Assistant" to start speaking</li>
+              <li>When prompted, allow microphone access</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

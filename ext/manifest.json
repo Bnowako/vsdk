@@ -1,0 +1,16 @@
+{
+    "manifest_version": 3,
+    "name": "AI Assistant Sidebar",
+    "version": "1.0",
+    "description": "Voice-enabled AI assistant in your browser sidebar",
+    "permissions": ["sidePanel", "audioCapture", "sidebar", "sidebar_action"],
+    "side_panel": {
+      "default_path": "sidebar.html"
+    },
+    "background": {
+      "service_worker": "background.js"
+    },
+    "action": {
+      "default_title": "Open AI Assistant"
+    }
+  }
