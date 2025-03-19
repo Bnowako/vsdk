@@ -18,6 +18,23 @@ let audioContext = new (window.AudioContext || window.webkitAudioContext)({
   sampleRate: CONFIG.AUDIO_SAMPLE_RATE
 });
 
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.command === "sendPageContent" && message.content) {
+    const contentEvent = {
+      event: 'pageContent',
+      content: message.content
+    };
+    // Ensure your WebSocket (socket) is connected before sending
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      console.log("sending page content", contentEvent)
+      socket.send(JSON.stringify(contentEvent));
+    } else {
+      console.error("WebSocket is not connected.");
+    }
+  }
+});
+
 /***** DOM Elements *****/
 document.addEventListener('DOMContentLoaded', () => {
   const talkButton = document.getElementById('talkButton');

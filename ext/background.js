@@ -1,4 +1,11 @@
+// Relay messages from content script to sidebar
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.command === "sendPageContent") {
+    chrome.runtime.sendMessage(message);
+  }
+});
+
+// Handle sidebar button click
 chrome.action.onClicked.addListener((tab) => {
-  // Open the side panel when the extension icon is clicked
-  chrome.sidePanel.open({ tabId: tab.id });
+  chrome.sidePanel.open({ windowId: tab.windowId });
 });
