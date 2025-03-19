@@ -7,11 +7,11 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from langchain_openai import ChatOpenAI
 
 from app.audio.audio_utils import mulaw_to_pcm
-from app.conversation.models import Conversation
 from app.voice_agent.conversation.conversation_manager import (
     audio_interpreter_loop,
 )
 from app.voice_agent.conversation.domain import ConversationEvent
+from app.voice_agent.conversation.models import Conversation
 from app.voice_agent.domain import RespondToHumanResult
 from app.voice_agent.schemas import (
     ClearEventWS,
