@@ -12,11 +12,13 @@ from app.voice_agent.domain import (
     TTSResult,
 )
 from app.voice_agent.language_agent import LLMAgent
+from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
 from app.voice_agent.text_voice_interface import TextVoiceInterface
 
 logger = logging.getLogger(__name__)
 
 text_voice_interface = TextVoiceInterface()
+stt_processor = GroqSTTProcessor()
 agent = LLMAgent(
     llm=ChatOpenAI(model="gpt-4o"),
     system_prompt="You are a helpful assistant that can answer questions and help with tasks.",
@@ -30,7 +32,7 @@ async def respond_to_human(
         f"Human speach detected, triggering response flow. PCM buffer duration {len(pcm_audio_buffer) // Config.Audio.bytes_per_sample / Config.Audio.sample_rate}s"
     )
 
-    stt_result = await text_voice_interface.speech_to_text(pcm_audio_buffer)
+    stt_result = await stt_processor(pcm_audio_buffer)
     logger.info("STT results: %s", stt_result)
 
     llm_result = LLMResult.empty()

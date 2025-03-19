@@ -2,15 +2,11 @@ import asyncio
 import base64
 import dataclasses
 import json
-import time
-import wave
-from io import BytesIO
 from typing import AsyncGenerator, Iterator, List, Optional, Tuple
 
 import websockets
 
 from app.config import Config, Secrets
-from app.voice_agent.domain import STTResult
 
 
 @dataclasses.dataclass
@@ -68,37 +64,8 @@ class TextVoiceInterface:
     def __init__(
         self,
         eleven: Config.Eleven = Config.Eleven(),
-        groq: Config.Groq = Config.Groq(),
-        async_groq: Config.Groq = Config.Groq(),
     ):
         self.eleven = eleven
-        self.groq = groq
-        self.async_groq = async_groq
-
-    async def speech_to_text(self, pcm_audio: bytes) -> STTResult:
-        stt_start_time = time.time()
-        wav_io = BytesIO()
-        with wave.open(wav_io, "wb") as wav_file:
-            wav_file.setnchannels(Config.Audio.channels)
-            wav_file.setsampwidth(Config.Audio.bytes_per_sample)
-            wav_file.setframerate(Config.Audio.sample_rate)
-            wav_file.writeframes(pcm_audio)
-        wav_io.seek(0)
-
-        transcription = await self.async_groq.async_client.audio.transcriptions.create(
-            file=("audio.wav", wav_io),
-            model=self.groq.transcription_model,
-            prompt="Audio klip jest częścią konwersacji w której pacjent dzwoni do lekarza rodzinnego",
-            language=self.groq.transcription_language,
-        )
-        stt_end_time = time.time()
-
-        return STTResult(
-            stt_start_time=stt_start_time,
-            stt_end_time=stt_end_time,
-            transcript=transcription.text,
-            speech_file=wav_io.getvalue(),
-        )
 
     def text_to_speech_streaming(self, text: str) -> Iterator[bytes]:
         response = self.eleven.client.text_to_speech.convert_as_stream(
