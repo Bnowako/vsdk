@@ -12,12 +12,12 @@ from app.voice_agent.domain import (
     TTSResult,
 )
 from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
-from app.voice_agent.text_voice_interface import TextVoiceInterface
 from app.voice_agent.ttt.OpenAIAgent import OpenAIAgent
+from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
 
 logger = logging.getLogger(__name__)
 
-text_voice_interface = TextVoiceInterface()
+text_voice_interface = ElevenTTSProcessor()
 stt_processor = GroqSTTProcessor()
 agent = OpenAIAgent(
     llm=ChatOpenAI(model="gpt-4o"),

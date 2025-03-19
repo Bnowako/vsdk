@@ -60,12 +60,17 @@ def split_by_words_or_by_fixed_interval_if_silence(audio_chunk: AudioChunk):
 
 # todo THIS FAILS REALLY QUIETLY IF THERE ARE SOME ISSUES WITH ELEVEN API, FIX THIS!!!!
 # to reproduce for example break api key
-class TextVoiceInterface:
+class ElevenTTSProcessor:
     def __init__(
         self,
         eleven: Config.Eleven = Config.Eleven(),
     ):
         self.eleven = eleven
+
+    def __call__(
+        self, input_generator: AsyncGenerator[str, None]
+    ) -> AsyncGenerator[bytes, None]:
+        return self.text_to_speech_streaming_ws(input_generator)
 
     def text_to_speech_streaming(self, text: str) -> Iterator[bytes]:
         response = self.eleven.client.text_to_speech.convert_as_stream(

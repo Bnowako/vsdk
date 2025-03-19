@@ -11,18 +11,18 @@ from app.voice_agent.domain import (
     TTSResult,
 )
 from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
-from app.voice_agent.text_voice_interface import TextVoiceInterface
+from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
 from app.voice_agent.ttt.domain import LLMResult
 from app.voice_agent.ttt.OpenAIAgent import OpenAIAgent
 
 logger = logging.getLogger(__name__)
 
-text_voice_interface = TextVoiceInterface()
-stt_processor = GroqSTTProcessor()
+stt = GroqSTTProcessor()
 agent = OpenAIAgent(
     llm=ChatOpenAI(model="gpt-4o"),
     system_prompt="You are a helpful assistant that can answer questions and help with tasks.",
 )
+tts = ElevenTTSProcessor()
 
 
 async def respond_to_human(
@@ -32,7 +32,7 @@ async def respond_to_human(
         f"Human speach detected, triggering response flow. PCM buffer duration {len(pcm_audio_buffer) // Config.Audio.bytes_per_sample / Config.Audio.sample_rate}s"
     )
 
-    stt_result = await stt_processor(pcm_audio_buffer)
+    stt_result = await stt(pcm_audio_buffer)
     logger.info("STT results: %s", stt_result)
 
     llm_result = LLMResult.empty()
@@ -42,7 +42,7 @@ async def respond_to_human(
         callback=lambda x: llm_result.update(x),
     )
 
-    voice_stream = text_voice_interface.text_to_speech_streaming_ws(output_llm_stream)
+    voice_stream = tts(output_llm_stream)
 
     tts_result = TTSResult.empty()
     first_chunk = True
