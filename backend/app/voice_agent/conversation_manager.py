@@ -12,12 +12,14 @@ from app.voice_agent.outbound_events import (
     send_result,
     send_stop_speaking,
 )
-from app.voice_agent.voice_agent_coordinator import respond_to_human
+from app.voice_agent.voice_agent import VoiceAgent
 
 logger = logging.getLogger(__name__)
 
 
-async def audio_interpreter_loop(conversation: Conversation, websocket: WebSocket):
+async def audio_interpreter_loop(
+    conversation: Conversation, websocket: WebSocket, voice_agent: VoiceAgent
+):
     try:
         while True:
             if conversation.is_new_audio_ready_to_process():
@@ -49,7 +51,9 @@ async def audio_interpreter_loop(conversation: Conversation, websocket: WebSocke
                         conversation.prepare_human_speech_for_interpretation()
                         conversation.add_agent_response_task(
                             task=asyncio.create_task(
-                                handle_respond_to_human(conversation, websocket)
+                                handle_respond_to_human(
+                                    conversation, websocket, voice_agent
+                                )
                             )
                         )
 
@@ -61,11 +65,13 @@ async def audio_interpreter_loop(conversation: Conversation, websocket: WebSocke
         logger.error(f"Exception in audio_interpreter_loop: {e}")
 
 
-async def handle_respond_to_human(conversation: Conversation, websocket: WebSocket):
+async def handle_respond_to_human(
+    conversation: Conversation, websocket: WebSocket, voice_agent: VoiceAgent
+):
     try:
         result: RespondToHumanResult = RespondToHumanResult.empty()
         conversation.new_agent_speech_start()
-        async for chunk in respond_to_human(
+        async for chunk in voice_agent.respond_to_human(
             pcm_audio_buffer=conversation.human_speech_without_response,
             sid=conversation.sid,
             callback=lambda x: result.update(x),

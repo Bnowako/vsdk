@@ -4,6 +4,7 @@ import json
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from langchain_openai import ChatOpenAI
 
 from app.audio.audio_utils import mulaw_to_pcm
 from app.conversation.models import Conversation
@@ -13,6 +14,10 @@ from app.voice_agent.schemas import (
     MediaEvent,
     StartEvent,
 )
+from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
+from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
+from app.voice_agent.ttt.OpenAIAgent import OpenAIAgent
+from app.voice_agent.voice_agent import VoiceAgent
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -40,6 +45,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 if event_type == "connected":
                     logger.info(f"Connected Message received {message}")
                 elif event_type == "start":
+                    voice_agent = VoiceAgent(
+                        tts=ElevenTTSProcessor(),
+                        stt=GroqSTTProcessor(),
+                        agent=OpenAIAgent(
+                            llm=ChatOpenAI(model="gpt-4o"),
+                            system_prompt="You are a helpful assistant that can answer questions and help with tasks.",
+                        ),
+                    )
                     start_event = StartEvent(**data)
 
                     sid = start_event.start.streamSid
@@ -47,7 +60,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     conversations_cache[sid] = conversation
 
                     task = asyncio.create_task(
-                        audio_interpreter_loop(conversation, websocket)
+                        audio_interpreter_loop(conversation, websocket, voice_agent)
                     )
                     conversation.audio_interpreter_loop = task
 
