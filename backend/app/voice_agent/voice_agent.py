@@ -50,6 +50,7 @@ class VoiceAgent:
         voice_stream = self.tts(output_llm_stream)
 
         tts_result = TTSResult.empty()
+        tts_result.start_time = time.time()
         first_chunk = True
         try:
             async for chunk in voice_stream:

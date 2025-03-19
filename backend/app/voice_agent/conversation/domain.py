@@ -1,6 +1,7 @@
+import base64
 from typing import Literal, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 from app.voice_agent.domain import RespondToHumanResult
 
@@ -13,6 +14,10 @@ class MediaEvent(BaseModel):
     type: Literal["media"] = "media"
     audio: bytes
     sid: str
+
+    @field_serializer("audio", when_used="json")
+    def serialize_audio_in_base64(self, audio: bytes) -> str:
+        return base64.b64encode(audio).decode("utf-8")
 
 
 class MarkEvent(BaseModel):
@@ -41,4 +46,13 @@ ConversationEvent = Union[
     ResultEvent,
     RestreamAudioEvent,
     StartRespondingEvent,
+]
+
+ConversationEvents = Literal[
+    "stop_speaking",
+    "media",
+    "mark",
+    "result",
+    "start_restream",
+    "start_responding",
 ]

@@ -2,7 +2,6 @@ import logging
 from asyncio import Task
 from typing import List
 
-
 from app.audio.vad import VADResult
 from app.config import Config
 
@@ -126,8 +125,8 @@ class AgentVoice:
 
 
 class Conversation:
-    def __init__(self, sid: str):
-        self.sid = sid
+    def __init__(self, id: str):
+        self.id = id
 
         # Audio IN
         # TODO extract all of those to separate class HumanSpeech
@@ -141,7 +140,7 @@ class Conversation:
         self.agent_response_tasks: List[AgentResponseTask] = []
 
         # Audio OUT
-        self.agent_voice = AgentVoice(sid)
+        self.agent_voice = AgentVoice(id)
 
         self.audio_interpreter_loop: Task[None] | None = None
 

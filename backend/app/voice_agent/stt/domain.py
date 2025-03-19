@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+import base64
+from pydantic import BaseModel, field_serializer
 
 
 class STTResult(BaseModel):
@@ -7,6 +8,10 @@ class STTResult(BaseModel):
 
     transcript: str
     speech_file: bytes
+
+    @field_serializer("speech_file", when_used="json")
+    def serialize_audio_in_base64(self, audio: bytes) -> str:
+        return base64.b64encode(audio).decode("utf-8")
 
     @classmethod
     def empty(cls) -> "STTResult":

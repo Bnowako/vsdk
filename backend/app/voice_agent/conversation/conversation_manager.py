@@ -2,7 +2,6 @@ import asyncio
 import logging
 from typing import Awaitable, Callable
 
-from app.voice_agent.conversation.models import Conversation
 from app.voice_agent.conversation.conversation_processor import (
     ConversationState,
     process,
@@ -16,6 +15,7 @@ from app.voice_agent.conversation.domain import (
     StartRespondingEvent,
     StopSpeakingEvent,
 )
+from app.voice_agent.conversation.models import Conversation
 from app.voice_agent.domain import RespondToHumanResult
 from app.voice_agent.voice_agent import VoiceAgent
 
@@ -84,13 +84,13 @@ async def handle_respond_to_human(
         conversation.new_agent_speech_start()
         async for chunk in voice_agent.respond_to_human(
             pcm_audio_buffer=conversation.human_speech_without_response,
-            sid=conversation.sid,
+            sid=conversation.id,
             callback=lambda x: result.update(x),
         ):
-            await callback(MediaEvent(audio=chunk, sid=conversation.sid))
+            await callback(MediaEvent(audio=chunk, sid=conversation.id))
             mark_id = conversation.agent_speech_sent(chunk)
 
-            await callback(MarkEvent(mark_id=mark_id, sid=conversation.sid))
+            await callback(MarkEvent(mark_id=mark_id, sid=conversation.id))
 
         await callback(ResultEvent(result=result))
     except Exception as e:
@@ -113,10 +113,10 @@ async def restream_audio(
         conversation.new_agent_speech_start()
         for agent_speech_chunk in unspoken_chunks:
             await callback(
-                MediaEvent(audio=agent_speech_chunk.audio, sid=conversation.sid)
+                MediaEvent(audio=agent_speech_chunk.audio, sid=conversation.id)
             )
             mark_id = conversation.agent_speech_sent(agent_speech_chunk.audio)
 
-            await callback(MarkEvent(mark_id=mark_id, sid=conversation.sid))
+            await callback(MarkEvent(mark_id=mark_id, sid=conversation.id))
     except Exception as e:
         logger.error(f"Exception in restream_audio: {e}")

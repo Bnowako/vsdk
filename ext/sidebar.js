@@ -17,15 +17,15 @@ let socket,
 
 /***** Chrome Message Listener *****/
 chrome.runtime.onMessage.addListener((message) => {
-  if (message.command === "sendPageContent" && message.content) {
-    const contentEvent = { event: 'pageContent', content: message.content };
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      console.log("sending page content", contentEvent);
-      socket.send(JSON.stringify(contentEvent));
-    } else {
-      console.error("WebSocket is not connected.");
-    }
-  }
+  // if (message.command === "sendPageContent" && message.content) {
+  //   const contentEvent = { type: 'pageContent', content: message.content };
+  //   if (socket && socket.readyState === WebSocket.OPEN) {
+  //     console.log("sending page content", contentEvent);
+  //     socket.send(JSON.stringify(contentEvent));
+  //   } else {
+  //     console.error("WebSocket is not connected.");
+  //   }
+  // }
 });
 
 /***** DOM Setup *****/
@@ -82,22 +82,20 @@ const updateConnectionStatus = (status, text) => {
 
 function startConversation() {
   updateConnectionStatus('connecting', 'Connecting...');
-  socket = new WebSocket(CONFIG.SOCKET_URL);
+  socket = new WebSocket('ws://localhost:8000/plugin/ws');
   socket.onopen = () => {
     updateConnectionStatus('connected', 'Connected');
-    socket.send(JSON.stringify({
-      event: 'start',
-      start: { streamSid: generateId(32), accountSid: generateId(32), callSid: generateId(32) }
-    }));
   };
   socket.onmessage = ({ data }) => {
     const msg = JSON.parse(data);
-    switch (msg.event) {
-      case 'result':  handleResultEvent(msg); break;
-      case 'media':   handleMediaEvent(msg); break;
-      case 'mark':    handleMarkEvent(msg); break;
-      case 'clear':   handleClearEvent(); break;
-      default: console.warn('Unknown event:', msg.event);
+    switch (msg.type) {
+      case 'result':     handleResultEvent(msg); break;
+      case 'media':      handleMediaEvent(msg); break;
+      case 'mark':       handleMarkEvent(msg); break;
+      case 'stop_speaking': handleClearEvent(); break;
+      case 'start_restream': console.log('Restreaming audio...'); break;
+      case 'start_responding': console.log('AI starting to respond...'); break;
+      default: console.warn('Unknown event type:', msg.type);
     }
   };
   socket.onclose = () => {
@@ -127,7 +125,7 @@ function endConversation() {
     window.currentAudioProcessor = null;
   }
   if (socket) {
-    socket.send(JSON.stringify({ event: 'closed' }));
+    // socket.send(JSON.stringify({ event: 'closed' }));
     socket.close();
   }
 }
@@ -161,7 +159,11 @@ async function startStream() {
       const inputBuffer = e.inputBuffer.getChannelData(0);
       const muLawBuffer = int16ToMuLaw(float32ToInt16(inputBuffer));
       const base64Buffer = btoa(String.fromCharCode(...muLawBuffer));
-      const mediaEvent = { event: 'media', media: { payload: base64Buffer } };
+      const mediaEvent = {
+        type: 'media',
+        audio: base64Buffer,
+        sid: generateId(32)
+      };
       if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(mediaEvent));
     };
   } catch (err) {
@@ -180,17 +182,17 @@ async function startStream() {
   }
 }
 
-function handleMediaEvent({ media: { payload } }) {
-  const muLawBytes = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
+function handleMediaEvent({ audio }) {
+  const muLawBytes = Uint8Array.from(atob(audio), c => c.charCodeAt(0));
   const pcmSamples = Int16Array.from(muLawBytes, muLawDecode);
   const float32Samples = Float32Array.from(pcmSamples, s => s / 32768);
   pendingAudioChunks.push({ samples: float32Samples, markId: null });
   if (!isPlaying) playNextAudio();
 }
 
-function handleMarkEvent({ mark: { name } }) {
+function handleMarkEvent({ mark_id }) {
   const unmarked = pendingAudioChunks.find(chunk => chunk.markId === null);
-  if (unmarked) unmarked.markId = name;
+  if (unmarked) unmarked.markId = mark_id;
   if (!isPlaying) playNextAudio();
 }
 
@@ -216,7 +218,11 @@ function playAudio(samples, callback) {
 }
 
 function sendMarkEventToServer(markId) {
-  socket.send(JSON.stringify({ event: 'mark', mark: { name: markId } }));
+  socket.send(JSON.stringify({
+    type: 'mark',
+    mark_id: markId,
+    sid: generateId(32)
+  }));
 }
 
 function stopAudio() {
@@ -231,23 +237,35 @@ function stopAudio() {
 
 /***** Result and Clear Handlers *****/
 function handleResultEvent({ result }) {
+  const stt = result.stt_result;
+  const llm = result.llm_result;
+  const tts = result.tts_result;
+
+  // Calculate durations
+  const sttDuration = stt.stt_end_time - stt.stt_start_time;
+  const llmDuration = llm.end_time - llm.start_time;
+  const ttsDuration = tts.end_time - tts.start_time;
+  const totalDuration = ttsDuration + llmDuration + sttDuration;
+  const firstTTSChunk = tts.first_chunk_time - tts.start_time;
+
   const timings = [
-    { label: 'Speech-to-Text', value: result.stt_duration, unit: 's' },
-    { label: 'AI Processing', value: result.llm_duration, unit: 's' },
-    { label: 'Text-to-Speech', value: result.tts_duration, unit: 's' },
-    { label: 'First Chunk', value: result.first_chunk_time, unit: 's' },
-    { label: 'Total Duration', value: result.total_duration, unit: 's' }
+    { label: 'Speech-to-Text', value: sttDuration.toFixed(2), unit: 's' },
+    { label: 'LLM', value: llmDuration.toFixed(2), unit: 's' },
+    { label: 'Text-to-Speech', value: ttsDuration.toFixed(2), unit: 's' },
+    { label: 'First Chunk', value: firstTTSChunk.toFixed(2), unit: 's' },
+    { label: 'Total Duration', value: totalDuration.toFixed(2), unit: 's' }
   ];
+
   const messageDiv = document.createElement('div');
   messageDiv.className = 'message';
   messageDiv.innerHTML = `
     <table class="metrics-table">
       <thead><tr><th>Metric</th><th>Duration</th></tr></thead>
-      <tbody>${timings.map(t => `<tr><td>${t.label}</td><td>${t.value.toLocaleString()} ${t.unit}</td></tr>`).join('')}</tbody>
+      <tbody>${timings.map(t => `<tr><td>${t.label}</td><td>${t.value} ${t.unit}</td></tr>`).join('')}</tbody>
     </table>
     <div class="message-content">
-      <div class="transcript"><strong>You:</strong> ${result.transcript}</div>
-      <div class="response"><strong>Assistant:</strong> ${result.response}</div>
+      <div class="transcript"><strong>You:</strong> ${stt.transcript}</div>
+      <div class="response"><strong>Assistant:</strong> ${llm.response}</div>
     </div>`;
   document.getElementById('conversation').appendChild(messageDiv);
   messageDiv.scrollIntoView({ behavior: 'smooth' });

@@ -29,7 +29,7 @@ class ConversationContainer:
         ),
     ):
         self.voice_agent = voice_agent
-        self.conversation = Conversation(sid=conversation_id)
+        self.conversation = Conversation(id=conversation_id)
 
         self.conversation.audio_interpreter_loop = asyncio.create_task(
             audio_interpreter_loop(
