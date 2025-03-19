@@ -4,7 +4,7 @@ import logging
 
 from app.audio.vad import VADResult, silero_iterator
 from app.config import Config
-from app.conversation.models import Conversation
+from app.voice_agent.conversation.models import Conversation
 
 logger = logging.getLogger(__name__)
 

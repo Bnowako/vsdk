@@ -2,8 +2,11 @@ import asyncio
 import logging
 from typing import Awaitable, Callable
 
-from app.conversation.conversation_processor import ConversationState, process
-from app.conversation.models import Conversation
+from app.voice_agent.conversation.models import Conversation
+from app.voice_agent.conversation.conversation_processor import (
+    ConversationState,
+    process,
+)
 from app.voice_agent.conversation.domain import (
     ConversationEvent,
     MarkEvent,
