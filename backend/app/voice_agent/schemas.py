@@ -1,5 +1,6 @@
-from pydantic import BaseModel
 from typing import Literal, Union
+
+from pydantic import BaseModel
 
 
 class StartData(BaseModel):
@@ -8,7 +9,7 @@ class StartData(BaseModel):
     callSid: str
 
 
-class StartEvent(BaseModel):
+class StartEventWS(BaseModel):
     event: Literal["start"] = "start"
     start: StartData
 
@@ -17,7 +18,7 @@ class MediaData(BaseModel):
     payload: str
 
 
-class MediaEvent(BaseModel):
+class MediaEventWS(BaseModel):
     event: Literal["media"] = "media"
     media: MediaData
 
@@ -26,12 +27,12 @@ class MarkData(BaseModel):
     name: str
 
 
-class MarkEvent(BaseModel):
+class MarkEventWS(BaseModel):
     event: Literal["mark"] = "mark"
     mark: MarkData
 
 
-class ClearEvent(BaseModel):
+class ClearEventWS(BaseModel):
     event: Literal["clear"] = "clear"
 
 
@@ -49,15 +50,15 @@ class CycleResult(BaseModel):
     response: str
 
 
-class ResultEvent(BaseModel):
+class ResultEventWS(BaseModel):
     event: Literal["result"] = "result"
     result: CycleResult
 
 
 EventType = Union[
-    StartEvent,
-    MediaEvent,
-    MarkEvent,
-    ClearEvent,
+    StartEventWS,
+    MediaEventWS,
+    MarkEventWS,
+    ClearEventWS,
     ClosedEvent,
 ]

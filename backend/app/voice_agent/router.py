@@ -8,17 +8,20 @@ from langchain_openai import ChatOpenAI
 
 from app.audio.audio_utils import mulaw_to_pcm
 from app.conversation.models import Conversation
-from app.voice_agent.conversation_manager import audio_interpreter_loop
+from app.voice_agent.conversation.conversation_manager import (
+    audio_interpreter_loop,
+)
+from app.voice_agent.conversation.domain import ConversationEvent
 from app.voice_agent.domain import RespondToHumanResult
 from app.voice_agent.schemas import (
-    ClearEvent,
+    ClearEventWS,
     CycleResult,
     MarkData,
-    MarkEvent,
+    MarkEventWS,
     MediaData,
-    MediaEvent,
-    ResultEvent,
-    StartEvent,
+    MediaEventWS,
+    ResultEventWS,
+    StartEventWS,
 )
 from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
 from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
@@ -59,14 +62,21 @@ async def websocket_endpoint(websocket: WebSocket):
                             system_prompt="You are a helpful assistant that can answer questions and help with tasks.",
                         ),
                     )
-                    start_event = StartEvent(**data)
+                    start_event = StartEventWS(**data)
 
                     sid = start_event.start.streamSid
                     conversation = Conversation(sid=sid)
                     conversations_cache[sid] = conversation
 
+                    async def conversation_events_handler(x: ConversationEvent):
+                        await handle_conversation_event(x, websocket)
+
                     task = asyncio.create_task(
-                        audio_interpreter_loop(conversation, websocket, voice_agent)
+                        audio_interpreter_loop(
+                            conversation=conversation,
+                            voice_agent=voice_agent,
+                            callback=conversation_events_handler,
+                        )
                     )
                     conversation.audio_interpreter_loop = task
 
@@ -75,7 +85,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         logger.error("Conversation not found")
                         raise ValueError("Conversation not found")
 
-                    media_event = MediaEvent(**data)
+                    media_event = MediaEventWS(**data)
                     decoded_audio = base64.b64decode(media_event.media.payload)
                     pcm_audio = mulaw_to_pcm(decoded_audio)
                     conversation.audio_received(pcm_audio)
@@ -87,7 +97,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         logger.error("Conversation not found")
                         raise ValueError("Conversation not found")
 
-                    mark_event = MarkEvent(**data)
+                    mark_event = MarkEventWS(**data)
                     logger.debug(f"Mark Message received {message}")
                     chunk_idx = mark_event.mark.name.split("_")[-1]
                     speech_idx = mark_event.mark.name.split("_")[-2]
@@ -109,16 +119,36 @@ async def websocket_endpoint(websocket: WebSocket):
     logger.info("Connection closed.")
 
 
+async def handle_conversation_event(event: ConversationEvent, websocket: WebSocket):
+    logger.info(f"🎭 Callback received: {event.type}")
+    match event.type:
+        case "stop_speaking":
+            await send_stop_speaking(websocket)
+
+        case "media":
+            await send_media(event.audio, websocket, event.sid)
+
+        case "mark":
+            await send_mark(websocket, event.mark_id, event.sid)
+
+        case "result":
+            await send_result(websocket, event.result)
+
+        case "start_restream" | "start_responding":
+            # These events don't need to send anything to websocket
+            pass
+
+
 async def send_media(bytez: bytes, websocket: WebSocket, sid: str):
     media_base64 = base64.b64encode(bytez).decode("utf-8")
-    event = MediaEvent(
+    event = MediaEventWS(
         media=MediaData(payload=media_base64),
     )
     await websocket.send_text(event.model_dump_json())
 
 
 async def send_mark(websocket: WebSocket, mark_id: str, sid: str):
-    event = MarkEvent(
+    event = MarkEventWS(
         mark=MarkData(name=str(mark_id)),
     )
     await websocket.send_text(event.model_dump_json())
@@ -129,7 +159,7 @@ async def send_result(
     result: RespondToHumanResult,
 ):
     await websocket.send_text(
-        ResultEvent(
+        ResultEventWS(
             result=CycleResult(
                 stt_duration=result.stt_result.stt_end_time
                 - result.stt_result.stt_start_time,
@@ -146,6 +176,6 @@ async def send_result(
     )
 
 
-async def send_stop_speaking(websocket: WebSocket, client_data: Conversation):
-    event = ClearEvent()
+async def send_stop_speaking(websocket: WebSocket):
+    event = ClearEventWS()
     await websocket.send_text(event.model_dump_json())

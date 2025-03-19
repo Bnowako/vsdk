@@ -1,24 +1,28 @@
 import asyncio
 import logging
-
-from fastapi import WebSocket
+from typing import Awaitable, Callable
 
 from app.conversation.conversation_processor import ConversationState, process
 from app.conversation.models import Conversation
-from app.voice_agent.domain import RespondToHumanResult
-from app.voice_agent.router import (
-    send_mark,
-    send_media,
-    send_result,
-    send_stop_speaking,
+from app.voice_agent.conversation.domain import (
+    ConversationEvent,
+    MarkEvent,
+    MediaEvent,
+    RestreamAudioEvent,
+    ResultEvent,
+    StartRespondingEvent,
+    StopSpeakingEvent,
 )
+from app.voice_agent.domain import RespondToHumanResult
 from app.voice_agent.voice_agent import VoiceAgent
 
 logger = logging.getLogger(__name__)
 
 
 async def audio_interpreter_loop(
-    conversation: Conversation, websocket: WebSocket, voice_agent: VoiceAgent
+    conversation: Conversation,
+    voice_agent: VoiceAgent,
+    callback: Callable[[ConversationEvent], Awaitable[None]],
 ):
     try:
         while True:
@@ -35,11 +39,12 @@ async def audio_interpreter_loop(
 
                     case ConversationState.BOTH_SPEAKING:
                         conversation.stop_speaking_agent()
-                        await send_stop_speaking(websocket, conversation)
+
+                        await callback(StopSpeakingEvent())
 
                     case ConversationState.SHORT_INTERRUPTION_DURING_AGENT_SPEAKING:
                         await restream_audio(
-                            websocket, conversation
+                            conversation, callback
                         )  # todo should be done on another task?
                         conversation.clear_human_speech()  # todo this forgets what was the short interruption "tak" / "nie". For now it is ok
 
@@ -52,7 +57,7 @@ async def audio_interpreter_loop(
                         conversation.add_agent_response_task(
                             task=asyncio.create_task(
                                 handle_respond_to_human(
-                                    conversation, websocket, voice_agent
+                                    conversation, voice_agent, callback
                                 )
                             )
                         )
@@ -66,9 +71,12 @@ async def audio_interpreter_loop(
 
 
 async def handle_respond_to_human(
-    conversation: Conversation, websocket: WebSocket, voice_agent: VoiceAgent
+    conversation: Conversation,
+    voice_agent: VoiceAgent,
+    callback: Callable[[ConversationEvent], Awaitable[None]],
 ):
     try:
+        await callback(StartRespondingEvent())
         result: RespondToHumanResult = RespondToHumanResult.empty()
         conversation.new_agent_speech_start()
         async for chunk in voice_agent.respond_to_human(
@@ -76,29 +84,36 @@ async def handle_respond_to_human(
             sid=conversation.sid,
             callback=lambda x: result.update(x),
         ):
-            await send_media(chunk, websocket, conversation.sid)
+            await callback(MediaEvent(audio=chunk, sid=conversation.sid))
             mark_id = conversation.agent_speech_sent(chunk)
-            await send_mark(websocket, mark_id, conversation.sid)
 
-        await send_result(
-            websocket=websocket,
-            result=result,
-        )
+            await callback(MarkEvent(mark_id=mark_id, sid=conversation.sid))
+
+        await callback(ResultEvent(result=result))
     except Exception as e:
-        logger.error(f"Exception in handle_respond_to_human: {e}")
+        logger.error(
+            f"Exception in handle_respond_to_human: {e}",
+            exc_info=True,
+        )
 
 
-async def restream_audio(websocket: WebSocket, conversation: Conversation):
+async def restream_audio(
+    conversation: Conversation,
+    callback: Callable[[ConversationEvent], Awaitable[None]],
+):
     try:
+        await callback(RestreamAudioEvent())
         logger.info(
             "Resending audio. All chunks: "  # todo add more logs
         )
         unspoken_chunks = conversation.get_unspoken_agent_speech()
         conversation.new_agent_speech_start()
         for agent_speech_chunk in unspoken_chunks:
-            await send_media(agent_speech_chunk.audio, websocket, conversation.sid)
+            await callback(
+                MediaEvent(audio=agent_speech_chunk.audio, sid=conversation.sid)
+            )
             mark_id = conversation.agent_speech_sent(agent_speech_chunk.audio)
 
-            await send_mark(websocket, mark_id, conversation.sid)
+            await callback(MarkEvent(mark_id=mark_id, sid=conversation.sid))
     except Exception as e:
         logger.error(f"Exception in restream_audio: {e}")
