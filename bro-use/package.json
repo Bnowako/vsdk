@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon src/index.ts"
+    "dev": "nodemon src/index.ts",
+    "debug": "ts-node src/debug.ts"
   },
   "keywords": [],
   "author": "",
@@ -13,8 +14,11 @@
   "description": "",
   "dependencies": {
     "@browserbasehq/stagehand": "^1.14.0",
+    "boxen": "^8.0.1",
+    "chalk": "^5.4.1",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/dotenv": "^6.1.1",
