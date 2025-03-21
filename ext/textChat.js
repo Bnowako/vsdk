@@ -1,5 +1,14 @@
 let chatSocket;
 
+
+let currentHtml = "";
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.command === "sendPageContent" && message.content) {
+    console.log("Updating current HTML");
+  }
+  // if there is nanobrowser text in html exchange it with "blazejbro"
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   const messageInput = document.getElementById('messageInput');
   const sendButton = document.getElementById('sendMessage');
