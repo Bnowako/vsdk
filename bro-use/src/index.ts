@@ -4,7 +4,18 @@ import { BrowserContext, Page, Stagehand } from '@browserbasehq/stagehand';
 import StagehandConfig from './stagehand.config';
 import { z } from 'zod';
 import { clearOverlays, drawObserveOverlay } from './utils';
+import { WebSocketServer } from 'ws';
 
+
+export type BaseMessage = {
+  type: "human" | "ai"  | "tool",
+  content: string,
+  conversation_id: string,
+  tool_calls?: {
+      name: string,
+      args: Record<string, unknown>,
+  }[],
+}
 dotenv.config();
 
 const app = express();
@@ -22,6 +33,42 @@ async function main() {
     const page = stagehand.page;
     const context = stagehand.context;
     await page.goto("https://bnowako.com");
+
+    const server = app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+
+    // Create WebSocket server
+    const wss = new WebSocketServer({ server });
+
+    wss.on('connection', (ws) => {
+      console.log('New WebSocket connection');
+
+      // Send initial message
+      ws.send(JSON.stringify({ hello: "world" }));
+
+      ws.on('message', (message) => {
+        console.log('received: %s', message);
+        const parsed = JSON.parse(message.toString()) as BaseMessage;
+
+        // Echo back the message
+        ws.send(JSON.stringify({
+          type: "human",
+          content: parsed.content,
+          conversation_id: "123",
+        } as BaseMessage));
+
+        ws.send(JSON.stringify({
+          type: "ai",
+          content: "content",
+          conversation_id: "123",
+        } as BaseMessage));
+      });
+
+      ws.on('close', () => {
+        console.log('Client disconnected');
+      });
+    });
 
     app.post('/', async (req: Request, res: Response) => {
       console.log(req.body);
@@ -46,10 +93,6 @@ async function main() {
       });
 
       res.send(JSON.stringify(extraction));
-    });
-
-    app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
     });
 
   } catch (err) {

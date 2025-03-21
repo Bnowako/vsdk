@@ -14,11 +14,13 @@
   "description": "",
   "dependencies": {
     "@browserbasehq/stagehand": "^1.14.0",
+    "@types/ws": "^8.18.0",
     "boxen": "^8.0.1",
     "chalk": "^5.4.1",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "langchain": "^0.3.19",
+    "ws": "^8.18.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
