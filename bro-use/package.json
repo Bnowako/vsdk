@@ -12,9 +12,12 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@browserbasehq/stagehand": "^1.14.0",
+    "dotenv": "^16.4.7",
     "express": "^4.21.2"
   },
   "devDependencies": {
+    "@types/dotenv": "^6.1.1",
     "@types/express": "^5.0.1",
     "@types/node": "^22.13.11",
     "nodemon": "^3.1.9",
