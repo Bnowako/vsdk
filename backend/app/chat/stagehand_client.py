@@ -41,10 +41,6 @@ class ScreenshotResponse(BaseModel):
 
 
 class StagehandClient:
-    """
-    A client for interacting with the Stagehand browser automation service.
-    """
-
     def __init__(self, base_url: str = "http://localhost:3333"):
         """
         Initialize the Stagehand client.
@@ -53,16 +49,6 @@ class StagehandClient:
             base_url: The base URL of the Stagehand service
         """
         self.client = httpx.AsyncClient(base_url=base_url)
-
-    async def close(self) -> None:
-        """Close the HTTP client connection."""
-        await self.client.aclose()
-
-    async def __aenter__(self) -> "StagehandClient":
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        await self.close()
 
     async def _make_request(
         self, method: str, endpoint: str, json: Optional[Dict[str, Any]] = None
@@ -168,3 +154,6 @@ class StagehandError(Exception):
     """Custom exception for Stagehand client errors."""
 
     pass
+
+
+stagehand_client = StagehandClient()

@@ -1,11 +1,10 @@
 import json
 import logging
 import uuid
-from typing import AsyncGenerator
 
-from fastapi import APIRouter, Depends, WebSocket
+from fastapi import APIRouter, WebSocket
 
-from app.chat.stagehand_client import StagehandClient
+from app.chat.stagehand_client import stagehand_client
 
 from .agent import LLMAgent
 from .schemas import PostUserMessage
@@ -14,15 +13,6 @@ router = APIRouter()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-async def get_stagehand_client() -> AsyncGenerator[StagehandClient, None]:
-    """Dependency that provides a StagehandClient instance"""
-    client = StagehandClient(base_url="http://localhost:3333")
-    try:
-        yield client
-    finally:
-        await client.close()
 
 
 # create web socket connection for chat
@@ -46,8 +36,6 @@ async def chat(websocket: WebSocket):
 
 
 @router.get("/chat/status")
-async def chat_status(
-    stagehand_client: StagehandClient = Depends(get_stagehand_client),
-):
+async def chat_status():
     response = await stagehand_client.extract()
     return {"status": "ok", "response": response}
