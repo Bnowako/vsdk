@@ -1,16 +1,23 @@
 import logging
-
 import time
 from typing import Annotated, AsyncGenerator, TypedDict
+
+from dotenv import load_dotenv
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.tools import tool  # type: ignore
 from langchain_openai import ChatOpenAI
-from dotenv import load_dotenv
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, START
 from langgraph.graph.message import add_messages
-from langgraph.graph import START, END
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
-from langgraph.checkpoint.memory import MemorySaver
+
+from app.chat.stagehand_tools import (
+    extract_page_content,
+    navigate_to_url,
+    observe_elements,
+    perform_action,
+)
 
 load_dotenv()
 
@@ -33,9 +40,26 @@ class LLMAgent:
     ) -> None:
         logger.info("Initializing LLMAgent")
         in_memory_store = MemorySaver()
-        llm = ChatOpenAI(model="gpt-4o-mini")
-        llm_with_tools = llm.bind_tools([what_day_and_time_is_it])  # type: ignore
-        tool_node = ToolNode(tools=[what_day_and_time_is_it])
+        llm = ChatOpenAI(model="gpt-4o")
+        llm_with_tools = llm.bind_tools(  # type: ignore
+            [
+                what_day_and_time_is_it,
+                navigate_to_url,
+                extract_page_content,
+                perform_action,
+                observe_elements,
+            ]
+        )
+
+        tool_node = ToolNode(
+            tools=[
+                what_day_and_time_is_it,
+                navigate_to_url,
+                perform_action,
+                extract_page_content,
+                observe_elements,
+            ]
+        )
 
         def chatbot(state: State) -> State:
             return {"messages": [llm_with_tools.invoke(state["messages"])]}
