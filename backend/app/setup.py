@@ -6,6 +6,7 @@ from beanie.odm.utils.init import init_beanie  # type: ignore
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.chat.router import router as chat_router
 from app.config import Config
 from app.plugin.router import router as plugin_router
 from app.twilio.router import router as twilio_router
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     app = MongoFastAPI(lifespan=db_lifespan, openapi_prefix="/api")  # type: ignore
     app.include_router(twilio_router)
     app.include_router(plugin_router)
+    app.include_router(chat_router)
 
     app.add_middleware(
         CORSMiddleware,

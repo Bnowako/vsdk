@@ -34,65 +34,101 @@ async function main() {
     const context = stagehand.context;
     await page.goto("https://bnowako.com");
 
-    const server = app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+    app.post('/navigate', async (req: Request, res: Response) => {
+      try {
+        const { url } = req.body;
+        await page.goto(url);
+        res.json({
+          message: `Navigated to: ${url}`,
+        });
+      } catch (err) {
+        res.status(500).json({
+          error: err instanceof Error ? err.message : 'Failed to navigate'
+        });
+      }
     });
 
-    // Create WebSocket server
-    const wss = new WebSocketServer({ server });
-
-    wss.on('connection', (ws) => {
-      console.log('New WebSocket connection');
-
-      // Send initial message
-      ws.send(JSON.stringify({ hello: "world" }));
-
-      ws.on('message', (message) => {
-        console.log('received: %s', message);
-        const parsed = JSON.parse(message.toString()) as BaseMessage;
-
-        // Echo back the message
-        ws.send(JSON.stringify({
-          type: "human",
-          content: parsed.content,
-          conversation_id: "123",
-        } as BaseMessage));
-
-        ws.send(JSON.stringify({
-          type: "ai",
-          content: "content",
-          conversation_id: "123",
-        } as BaseMessage));
-      });
-
-      ws.on('close', () => {
-        console.log('Client disconnected');
-      });
+    app.post('/act', async (req: Request, res: Response) => {
+      try {
+        const { action, variables } = req.body;
+        await page.act({
+          action,
+          variables,
+          slowDomBasedAct: false,
+        });
+        res.json({ message: `Action performed: ${action}` });
+      } catch (err) {
+        res.status(500).json({
+          error: err instanceof Error ? err.message : 'Failed to perform action'
+        });
+      }
     });
 
-    app.post('/', async (req: Request, res: Response) => {
-      console.log(req.body);
-      const { action } = req.body;
+    app.get('/extract', async (req: Request, res: Response) => {
+      try {
+        const bodyText = await page.evaluate(() => document.body.innerText);
+        const content = bodyText
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => {
+            if (!line) return false;
+            if (
+              (line.includes('{') && line.includes('}')) ||
+              line.includes('@keyframes') ||
+              line.match(/^\.[a-zA-Z0-9_-]+\s*{/) ||
+              line.match(/^[a-zA-Z-]+:[a-zA-Z0-9%\s\(\)\.,-]+;$/)
+            ) {
+              return false;
+            }
+            return true;
+          })
+          .map(line => {
+            return line.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+              String.fromCharCode(parseInt(hex, 16))
+            );
+          });
 
-      await clearOverlays(page);
-      const result = await page.act({action: action});
-      res.send(JSON.stringify(result));
+        res.json({ content: content.join('\n') });
+      } catch (err) {
+        res.status(500).json({
+          error: err instanceof Error ? err.message : 'Failed to extract content'
+        });
+      }
     });
 
-    app.get('/describe', async (req: Request, res: Response) => {
-      // return page.screenshot as a base64 string
-      const observation = await page.observe("Describe this page to a blind person. Explicitly general things that could be done on this page. Buttons and links.");
-      await drawObserveOverlay(page, observation); // Highlight the search box
-      console.log("observation", observation);
+    app.post('/observe', async (req: Request, res: Response) => {
+      try {
+        const { instruction } = req.body;
+        const observations = await page.observe({
+          instruction,
+          returnAction: false,
+        });
+        res.json({ observations });
+      } catch (err) {
+        res.status(500).json({
+          error: err instanceof Error ? err.message : 'Failed to observe'
+        });
+      }
+    });
 
-      const extraction = await page.extract({
-        instruction: "Describe this page to a blind person. Explicitly general things that could be done on this page.",
-        schema: z.object({
-          description: z.string(),
-        }),
-      });
+    app.get('/screenshot', async (req: Request, res: Response) => {
+      try {
+        const screenshotBuffer = await page.screenshot({
+          fullPage: false
+        });
+        const screenshotBase64 = screenshotBuffer.toString('base64');
+        const name = `screenshot-${new Date().toISOString().replace(/:/g, '-')}`;
 
-      res.send(JSON.stringify(extraction));
+        res.json({
+          name,
+          screenshot: screenshotBase64,
+          message: `Screenshot taken with name: ${name}`
+        });
+      } catch (err) {
+        res.status(500).json({
+          error: err instanceof Error ? err.message : 'Failed to take screenshot'
+        });
+      }
     });
 
   } catch (err) {

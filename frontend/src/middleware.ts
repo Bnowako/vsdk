@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 const PROXY_URL =
   process.env.NODE_ENV === "production"
     ? "https://api.10xeasier.com"
-    : "http://localhost:3333";
+    : "http://localhost:8000";
 
 
 
