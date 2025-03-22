@@ -30,7 +30,6 @@ def what_day_and_time_is_it():
 class LLMAgent:
     def __init__(
         self,
-        tools: list[ToolNode],
     ) -> None:
         logger.info("Initializing LLMAgent")
         in_memory_store = MemorySaver()

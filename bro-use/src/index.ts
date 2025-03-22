@@ -1,21 +1,8 @@
-import express, { Request, Response } from 'express';
+import { Stagehand } from '@browserbasehq/stagehand';
 import dotenv from 'dotenv';
-import { BrowserContext, Page, Stagehand } from '@browserbasehq/stagehand';
+import express, { Request, Response } from 'express';
 import StagehandConfig from './stagehand.config';
-import { z } from 'zod';
-import { clearOverlays, drawObserveOverlay } from './utils';
-import { WebSocketServer } from 'ws';
 
-
-export type BaseMessage = {
-  type: "human" | "ai"  | "tool",
-  content: string,
-  conversation_id: string,
-  tool_calls?: {
-      name: string,
-      args: Record<string, unknown>,
-  }[],
-}
 dotenv.config();
 
 const app = express();
@@ -34,8 +21,13 @@ async function main() {
     const context = stagehand.context;
     await page.goto("https://bnowako.com");
 
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+
     app.post('/navigate', async (req: Request, res: Response) => {
       try {
+        console.log("Navigating to page");
         const { url } = req.body;
         await page.goto(url);
         res.json({
@@ -50,6 +42,7 @@ async function main() {
 
     app.post('/act', async (req: Request, res: Response) => {
       try {
+        console.log("Performing action on page");
         const { action, variables } = req.body;
         await page.act({
           action,
@@ -66,6 +59,7 @@ async function main() {
 
     app.get('/extract', async (req: Request, res: Response) => {
       try {
+        console.log("Extracting text from page");
         const bodyText = await page.evaluate(() => document.body.innerText);
         const content = bodyText
           .split('\n')
@@ -98,6 +92,7 @@ async function main() {
 
     app.post('/observe', async (req: Request, res: Response) => {
       try {
+        console.log("Observing page");
         const { instruction } = req.body;
         const observations = await page.observe({
           instruction,
@@ -113,6 +108,7 @@ async function main() {
 
     app.get('/screenshot', async (req: Request, res: Response) => {
       try {
+        console.log("Taking screenshot");
         const screenshotBuffer = await page.screenshot({
           fullPage: false
         });
