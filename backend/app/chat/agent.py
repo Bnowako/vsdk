@@ -3,7 +3,7 @@ import time
 from typing import Annotated, AsyncGenerator, TypedDict
 
 from dotenv import load_dotenv
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool  # type: ignore
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
@@ -62,7 +62,30 @@ class LLMAgent:
         )
 
         def chatbot(state: State) -> State:
-            return {"messages": [llm_with_tools.invoke(state["messages"])]}
+            system_prompt = SystemMessage(
+                content="""
+You are a helpful assistant that is able to browse the internet.
+
+Answer in Concise manner. Start always with a general high level overwiew and only if user asks for more details, use the tools to provide more details.
+
+You can use the following tools to help the user:
+- navigate_to_url
+- extract_page_content
+- perform_action
+- observe_elements
+
+You can also use the following tools to help the user:
+- what_day_and_time_is_it
+
+You can use the following tools to help the user:
+- navigate_to_url
+- extract_page_content
+
+Speak only in Polish.
+"""
+            )
+            msgs = [system_prompt] + state["messages"]
+            return {"messages": [llm_with_tools.invoke(msgs)]}
 
         graph_builder = StateGraph(State)
         graph_builder.add_node("chatbot", chatbot)  # type: ignore
@@ -77,7 +100,7 @@ class LLMAgent:
         graph_builder.add_edge("chatbot", END)
 
         self.graph: CompiledStateGraph = graph_builder.compile(
-            checkpointer=in_memory_store
+            checkpointer=in_memory_store,
         )  # type: ignore
 
     async def astream(

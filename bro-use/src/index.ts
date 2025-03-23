@@ -98,6 +98,7 @@ async function main() {
           instruction,
           returnAction: false,
         });
+        console.log("Observations", observations);
         res.json({ observations });
       } catch (err) {
         res.status(500).json({

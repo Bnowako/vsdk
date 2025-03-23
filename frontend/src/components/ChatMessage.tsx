@@ -26,6 +26,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           {message.tool_calls.map((tool, i) => (
             <div key={i}>
               Tool: {tool.name}
+              {JSON.stringify(tool)}
             </div>
           ))}
         </div>

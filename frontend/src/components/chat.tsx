@@ -35,7 +35,7 @@ export function CardsChat({ messages, onSendMessage }: CardsChatProps) {
 
   return (
     <>
-      <Card>
+      <Card className="max-w-2xl">
         <CardHeader className="flex flex-row items-center">
           <div className="flex items-center space-x-4">
             <Avatar>
