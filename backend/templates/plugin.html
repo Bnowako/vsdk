@@ -458,7 +458,7 @@
         // Send marks for any remaining chunks
         pendingAudioChunks.forEach(chunk => {
           if (chunk.markId && socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: 'mark', mark_id: chunk.markId }));
+            socket.send(JSON.stringify({ type: 'mark', mark_id: chunk.markId, sid: "123" }));
           }
         });
 
