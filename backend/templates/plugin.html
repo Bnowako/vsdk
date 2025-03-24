@@ -221,7 +221,9 @@
           audioContext,
           mediaStreamSource,
           scriptProcessor,
-          isRecording = false;
+          isRecording = false,
+          pendingAudioChunks = [],
+          isPlaying = false;
 
       /***** Chrome Message Listener *****/
       if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
@@ -394,27 +396,31 @@
 
         // Convert Int16 to Float32, handling the bytes properly
         for (let i = 0; i < bytes.length / 2; i++) {
-          // Combine two bytes into one 16-bit integer (little-endian)
           const int16 = (bytes[i * 2] & 0xff) | ((bytes[i * 2 + 1] & 0xff) << 8);
-          // Convert to signed value
           const signedInt16 = int16 >= 0x8000 ? int16 - 0x10000 : int16;
-          // Normalize to float between -1 and 1
           float32Data[i] = signedInt16 / 32768.0;
         }
 
-        // Create AudioBuffer with the correct length
-        const audioBuffer = audioContext.createBuffer(1, float32Data.length, CONFIG.AUDIO_SAMPLE_RATE);
-        audioBuffer.getChannelData(0).set(float32Data);
+        // Add to pending chunks queue
+        pendingAudioChunks.push({ samples: float32Data, markId: null });
 
-        // Play the audio
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-        source.start(0);
+        // Start playing if not already playing
+        if (!isPlaying) {
+          playNextAudio();
+        }
       }
 
       function handleMarkEvent({ mark_id, sid }) {
-        // Handle mark events if needed
+        // Find the first unmarked chunk and mark it
+        const unmarked = pendingAudioChunks.find(chunk => chunk.markId === null);
+        if (unmarked) {
+          unmarked.markId = mark_id;
+        }
+
+        // Start playing if not already playing
+        if (!isPlaying) {
+          playNextAudio();
+        }
       }
 
       function handleResultEvent({ result }) {
@@ -450,6 +456,51 @@
 
       function handleStopSpeakingEvent() {
         // Handle stop speaking event if needed
+      }
+
+      /***** Audio Playback Functions *****/
+      function playNextAudio() {
+        // Find the first marked chunk
+        const nextIndex = pendingAudioChunks.findIndex(chunk => chunk.markId !== null);
+        if (nextIndex === -1) {
+          isPlaying = false;
+          return;
+        }
+
+        isPlaying = true;
+        const { samples, markId } = pendingAudioChunks.splice(nextIndex, 1)[0];
+
+        // Create AudioBuffer with the correct length
+        const audioBuffer = audioContext.createBuffer(1, samples.length, CONFIG.AUDIO_SAMPLE_RATE);
+        audioBuffer.getChannelData(0).set(samples);
+
+        // Play the audio
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+
+        // When this chunk finishes, send mark and play next chunk
+        source.onended = () => {
+          if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'mark', mark_id: markId, sid: "123" }));
+          }
+          playNextAudio();
+        };
+
+        source.start(0);
+      }
+
+      function stopAudio() {
+        // Send marks for any remaining chunks
+        pendingAudioChunks.forEach(chunk => {
+          if (chunk.markId && socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'mark', mark_id: chunk.markId }));
+          }
+        });
+
+        // Clear pending chunks and stop playback
+        pendingAudioChunks = [];
+        isPlaying = false;
       }
 
       /***** Utility Functions *****/
