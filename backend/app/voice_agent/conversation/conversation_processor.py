@@ -1,6 +1,5 @@
-from enum import Enum
-
 import logging
+from enum import Enum
 
 from app.audio.vad import VADResult, silero_iterator
 from app.config import Config
@@ -66,4 +65,4 @@ def check_for_speech(conversation: Conversation) -> VADResult | None:
         > 1 * Config.Audio.sample_rate * Config.Audio.bytes_per_sample
     ):
         logger.warning("Too much audio data to process. Get rid off me")
-    return silero_iterator(data_to_process, conversation.sid)
+    return silero_iterator(data_to_process, conversation.id)

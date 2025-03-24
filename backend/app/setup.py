@@ -1,12 +1,15 @@
-from typing import Dict, Any
+import logging
+from typing import Any, Dict
+
+import motor.motor_asyncio
 from beanie.odm.utils.init import init_beanie  # type: ignore
 from fastapi import FastAPI
-import motor.motor_asyncio
 from fastapi.middleware.cors import CORSMiddleware
-import logging
 
-from app.voice_agent.router import router as voice_agent_router
+from app.chat.router import router as chat_router
 from app.config import Config
+from app.plugin.router import router as plugin_router
+from app.twilio.router import router as twilio_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -38,7 +41,9 @@ async def db_lifespan(app: MongoFastAPI):
 
 def create_app() -> FastAPI:
     app = MongoFastAPI(lifespan=db_lifespan, openapi_prefix="/api")  # type: ignore
-    app.include_router(voice_agent_router)
+    app.include_router(twilio_router)
+    app.include_router(plugin_router)
+    app.include_router(chat_router)
 
     app.add_middleware(
         CORSMiddleware,

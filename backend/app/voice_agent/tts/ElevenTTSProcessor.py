@@ -2,11 +2,15 @@ import asyncio
 import base64
 import dataclasses
 import json
-from typing import AsyncGenerator, Iterator, List, Optional, Tuple
+import logging
+from typing import AsyncIterator, Iterator, List, Optional, Tuple
 
 import websockets
 
 from app.config import Config, Secrets
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -66,101 +70,135 @@ class ElevenTTSProcessor:
         eleven: Config.Eleven = Config.Eleven(),
     ):
         self.eleven = eleven
+        logger.info(f"Initialized ElevenTTSProcessor with voice ID: {eleven.voice}")
 
-    def __call__(
-        self, input_generator: AsyncGenerator[str, None]
-    ) -> AsyncGenerator[bytes, None]:
+    def __call__(self, input_generator: AsyncIterator[str]) -> AsyncIterator[bytes]:
+        logger.debug("Starting text-to-speech streaming via websocket")
         return self.text_to_speech_streaming_ws(input_generator)
 
     def text_to_speech_streaming(self, text: str) -> Iterator[bytes]:
-        response = self.eleven.client.text_to_speech.convert_as_stream(
-            voice_id=self.eleven.voice,
-            optimize_streaming_latency="0",
-            output_format=self.eleven.output_format,
-            text=text,
-            model_id=self.eleven.model,
-        )
-        return response
+        logger.debug(f"Converting text to speech using REST API: {text[:100]}...")
+        try:
+            response = self.eleven.client.text_to_speech.convert_as_stream(
+                voice_id=self.eleven.voice,
+                optimize_streaming_latency="0",
+                output_format=self.eleven.output_format,
+                text=text,
+                model_id=self.eleven.model,
+            )
+            return response
+        except Exception as e:
+            logger.error(f"Error in text_to_speech_streaming: {str(e)}")
+            raise
 
     async def text_to_speech_streaming_ws(
-        self, input_generator: AsyncGenerator[str, None]
-    ) -> AsyncGenerator[bytes, None]:
+        self, input_generator: AsyncIterator[str]
+    ) -> AsyncIterator[bytes]:
+        logger.debug("Starting websocket streaming session")
         audio_queue: asyncio.Queue[AudioChunk | None] = asyncio.Queue()
 
         async def send_and_listen():
-            uri = f"wss://api.elevenlabs.io/v1/text-to-speech/{self.eleven.voice}/stream-input?model_id=eleven_turbo_v2_5&output_format=ulaw_8000&language_code=pl"
+            uri = f"wss://api.elevenlabs.io/v1/text-to-speech/{self.eleven.voice}/stream-input?model_id={self.eleven.model}&output_format={self.eleven.output_format}&language_code={self.eleven.language}"
+            logger.debug(f"Connecting to websocket at: {uri}")
 
-            async with websockets.connect(uri) as websocket:
-                await websocket.send(
-                    json.dumps(
-                        {
-                            "text": " ",
-                            "voice_settings": {
-                                "stability": 0.5,
-                                "similarity_boost": 0.8,
-                            },
-                            "xi_api_key": Secrets.ELEVENLABS_API_KEY,
-                        }
+            try:
+                async with websockets.connect(uri) as websocket:
+                    logger.debug("Websocket connection established")
+                    await websocket.send(
+                        json.dumps(
+                            {
+                                "text": " ",
+                                "voice_settings": {
+                                    "stability": 0.5,
+                                    "similarity_boost": 0.8,
+                                },
+                                "xi_api_key": Secrets.ELEVENLABS_API_KEY,
+                            }
+                        )
                     )
-                )
 
-                async def listen():
-                    while True:
-                        try:
-                            message = await websocket.recv()
-                            data = json.loads(message)
-                            if data.get("audio"):
-                                audio_data = base64.b64decode(data["audio"])
-                                alignment = None
-                                if data.get("normalizedAlignment"):
-                                    normalized_alignment = data["normalizedAlignment"]
-                                    alignment = NormalizedAlignment(
-                                        chars=normalized_alignment["chars"],
-                                        charStartTimesMs=normalized_alignment[
-                                            "charStartTimesMs"
-                                        ],
-                                        charDurationsMs=normalized_alignment[
-                                            "charDurationsMs"
-                                        ],
-                                    )
+                    async def listen():
+                        while True:
+                            try:
+                                message = await websocket.recv()
+                                data = json.loads(message)
+                                if data.get("audio"):
+                                    logger.debug("Received audio chunk")
+                                    audio_data = base64.b64decode(data["audio"])
+                                    alignment = None
+                                    if data.get("normalizedAlignment"):
+                                        normalized_alignment = data[
+                                            "normalizedAlignment"
+                                        ]
+                                        alignment = NormalizedAlignment(
+                                            chars=normalized_alignment["chars"],
+                                            charStartTimesMs=normalized_alignment[
+                                                "charStartTimesMs"
+                                            ],
+                                            charDurationsMs=normalized_alignment[
+                                                "charDurationsMs"
+                                            ],
+                                        )
 
-                                await audio_queue.put(
-                                    AudioChunk(
-                                        audio=audio_data, normalized_alignment=alignment
+                                    await audio_queue.put(
+                                        AudioChunk(
+                                            audio=audio_data,
+                                            normalized_alignment=alignment,
+                                        )
                                     )
-                                )
-                            elif data.get("isFinal"):
+                                elif data.get("isFinal"):
+                                    logger.debug("Received final message")
+                                    break
+                            except websockets.exceptions.ConnectionClosed:
+                                logger.error("Websocket connection closed unexpectedly")
                                 break
-                        except websockets.exceptions.ConnectionClosed:
-                            break
-                    # Signal that we're done
-                    await audio_queue.put(None)
+                            except Exception as e:
+                                logger.error(f"Error in websocket listener: {str(e)}")
+                                break
+                        logger.debug("Listener finished, sending None to queue")
+                        await audio_queue.put(None)
 
-                listen_task = asyncio.create_task(listen())
+                    listen_task = asyncio.create_task(listen())
 
-                async for text in self._text_chunker(input_generator):
-                    await websocket.send(json.dumps({"text": text}))
+                    async for text in self._text_chunker(input_generator):
+                        logger.debug(f"Sending text chunk: {text[:100]}...")
+                        await websocket.send(json.dumps({"text": text}))
 
-                await websocket.send(json.dumps({"text": ""}))
-                await listen_task
+                    await websocket.send(json.dumps({"text": ""}))
+                    await listen_task
+
+            except websockets.exceptions.WebSocketException as e:
+                logger.error(f"Websocket connection error: {str(e)}")
+                raise
+            except Exception as e:
+                logger.error(f"Unexpected error in send_and_listen: {str(e)}")
+                raise
 
         send_task = asyncio.create_task(send_and_listen())
 
-        while True:
-            audio_chunk = await audio_queue.get()
-            if audio_chunk is None:
-                break
-            yield audio_chunk.audio
-            # TODO uncomment this
-            # for word_audio_chunk in split_by_words_or_by_fixed_interval_if_silence(
-            #     audio_chunk
-            # ):
-            #     yield word_audio_chunk
+        try:
+            while True:
+                audio_chunk = await audio_queue.get()
+                if audio_chunk is None:
+                    logger.debug("Received None chunk, ending stream")
+                    break
+                yield audio_chunk.audio
+                # TODO uncomment this
+                # for word_audio_chunk in split_by_words_or_by_fixed_interval_if_silence(
+                #     audio_chunk
+                # ):
+                #     yield word_audio_chunk
 
-        await send_task  # Ensure send_and_listen() completes
+            await send_task
+            logger.debug("Streaming session completed successfully")
 
-    async def _text_chunker(self, chunks: AsyncGenerator[str, None]):
+        except Exception as e:
+            logger.error(f"Error in streaming loop: {str(e)}")
+            raise
+
+    async def _text_chunker(self, chunks: AsyncIterator[str]):
         """Split text into chunks, ensuring to not break sentences."""
+        logger.debug("Starting text chunking")
         splitters = (
             ".",
             ",",

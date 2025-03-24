@@ -1,10 +1,9 @@
-import os
 import logging
+import os
+
 from dotenv import load_dotenv
 from elevenlabs import ElevenLabs
-
 from groq import AsyncGroq
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,9 +25,10 @@ class Config:
 
     class Eleven:
         client: ElevenLabs = ElevenLabs(api_key=Secrets.ELEVENLABS_API_KEY)
-        model: str = "eleven_turbo_v2_5"
+        model: str = "eleven_flash_v2_5"
         voice: str = "Xb7hH8MSUJpSbSDYk0k2"
-        output_format: str = "ulaw_8000"
+        output_format: str = "pcm_8000"
+        language: str = "pl"
 
         def with_model(self, model: str):
             self.model = model

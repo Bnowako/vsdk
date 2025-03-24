@@ -9,7 +9,7 @@ class StartData(BaseModel):
     callSid: str
 
 
-class StartEventWS(BaseModel):
+class TwilioStartEvent(BaseModel):
     event: Literal["start"] = "start"
     start: StartData
 
@@ -18,7 +18,7 @@ class MediaData(BaseModel):
     payload: str
 
 
-class MediaEventWS(BaseModel):
+class TwilioMediaEvent(BaseModel):
     event: Literal["media"] = "media"
     media: MediaData
 
@@ -27,7 +27,7 @@ class MarkData(BaseModel):
     name: str
 
 
-class MarkEventWS(BaseModel):
+class TwilioMarkEvent(BaseModel):
     event: Literal["mark"] = "mark"
     mark: MarkData
 
@@ -36,7 +36,7 @@ class ClearEventWS(BaseModel):
     event: Literal["clear"] = "clear"
 
 
-class ClosedEvent(BaseModel):
+class TwilioClosedEvent(BaseModel):
     event: Literal["closed"] = "closed"
 
 
@@ -50,15 +50,15 @@ class CycleResult(BaseModel):
     response: str
 
 
-class ResultEventWS(BaseModel):
+class CustomResultEvent(BaseModel):
     event: Literal["result"] = "result"
     result: CycleResult
 
 
-EventType = Union[
-    StartEventWS,
-    MediaEventWS,
-    MarkEventWS,
+TwilioEventType = Union[
+    TwilioStartEvent,
+    TwilioMediaEvent,
+    TwilioMarkEvent,
     ClearEventWS,
-    ClosedEvent,
+    TwilioClosedEvent,
 ]
