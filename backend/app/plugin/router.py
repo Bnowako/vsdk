@@ -7,7 +7,6 @@ from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from langchain_openai import ChatOpenAI
 from starlette.templating import Jinja2Templates
 
-from app.audio.audio_utils import mulaw_to_pcm
 from app.voice_agent.conversation.domain import (
     ConversationEvent,
     ConversationEvents,
@@ -63,9 +62,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     case "media":
                         media_event = MediaEvent(**data)
                         decoded_audio = base64.b64decode(media_event.audio)
-                        pcm_audio = mulaw_to_pcm(decoded_audio)
-
-                        conversation_container.audio_received(pcm_audio)
+                        conversation_container.audio_received(decoded_audio)
                     case "mark":
                         mark_event = MarkEvent(**data)
                         chunk_idx = mark_event.mark_id.split("_")[-1]
@@ -92,22 +89,3 @@ async def websocket_endpoint(websocket: WebSocket):
 async def handle_conversation_event(event: ConversationEvent, websocket: WebSocket):
     logger.info(f"🎭 Callback received: {event.type}")
     await websocket.send_text(event.model_dump_json())
-
-
-@router.websocket("/chat/ws")
-async def chat_endpoint(websocket: WebSocket):
-    logger.info("Connection requested")
-    await websocket.accept()
-    logger.info("Connection accepted")
-
-    try:
-        while True:
-            try:
-                message = await websocket.receive_text()
-                logger.info(f"Message received: {message}")
-                await websocket.send_text(json.dumps({"content": "Hej"}))
-            except WebSocketDisconnect:
-                logger.info("WebSocket disconnected")
-                break
-    finally:
-        logger.info("Connection closed.")

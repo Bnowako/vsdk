@@ -2,208 +2,182 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>AI Plugin Assistant</title>
-     <style>
+    <title>AI Assistant Sidebar</title>
+    <style>
       :root {
-  --primary-color: #4A90E2;
-  --secondary-color: #F5F7FA;
-  --text-color: #2C3E50;
-  --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
+        --primary-color: #4A90E2;
+        --secondary-color: #F5F7FA;
+        --text-color: #2C3E50;
+        --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
 
-body {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
-  margin: 0;
-  padding: 1rem;
-  width: 400px;
-  height: 500px;
-}
+      body {
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
+        margin: 0;
+        padding: 1rem;
+        width: 400px;
+        height: 500px;
+      }
 
-.container {
-  width: 100%;
-  max-width: 750px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  margin: 0 auto;
-}
+      .container {
+        width: 100%;
+        max-width: 750px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        margin: 0 auto;
+      }
 
-h1 {
-  color: var(--text-color);
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  text-align: center;
-}
-body {
-    width: 100%;
-    height: 100vh;
-    margin: 0;
-    padding: 10px;
-    font-family: Arial, sans-serif;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+      h1 {
+        color: var(--text-color);
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        text-align: center;
+      }
 
-  #conversation {
-    flex: 1;
-    overflow-y: auto;
-    margin-bottom: 10px;
-    padding: 5px;
-  }
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 0;
+      }
 
-  .controls {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 0;
-  }
+      button {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: var(--shadow);
+      }
 
-  /* Add more of your existing styles here */
-.controls {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
-  margin-bottom: 1rem;
-}
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+      }
 
-button {
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 50px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: var(--shadow);
-}
+      button:active {
+        transform: translateY(0);
+      }
 
-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-}
+      button.listening {
+        background-color: #28a745;
+        animation: pulse 2s infinite;
+      }
 
-button:active {
-  transform: translateY(0);
-}
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+      }
 
-button.listening {
-  background-color: #28a745;
-  animation: pulse 2s infinite;
-}
+      #conversation {
+        background: white;
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+        padding: 1rem;
+        flex-grow: 1;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+      }
 
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
-}
+      #conversation h2 {
+        color: var(--text-color);
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.2rem;
+      }
 
-#conversation {
-  background: white;
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  padding: 1rem;
-  flex-grow: 1;
-  overflow-y: auto;
-  scroll-behavior: smooth;
-}
+      .message {
+        background: var(--secondary-color);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 0.8rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
 
-#conversation h2 {
-  color: var(--text-color);
-  margin-top: 0;
-  margin-bottom: 1rem;
-  font-size: 1.2rem;
-}
+      .metrics-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 0.8rem;
+        background: rgba(74, 144, 226, 0.05);
+        border-radius: 8px;
+        overflow: hidden;
+        font-size: 0.8rem;
+      }
 
-.message {
-  background: var(--secondary-color);
-  padding: 1rem;
-  border-radius: 8px;
-  margin-bottom: 0.8rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
+      .metrics-table th, .metrics-table td {
+        padding: 0.3rem 0.6rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(74, 144, 226, 0.1);
+      }
 
-.metrics-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 0.8rem;
-  background: rgba(74, 144, 226, 0.05);
-  border-radius: 8px;
-  overflow: hidden;
-  font-size: 0.8rem;
-}
+      .metrics-table th {
+        background: rgba(74, 144, 226, 0.1);
+        font-weight: 500;
+        color: var(--primary-color);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+      }
 
-.metrics-table th, .metrics-table td {
-  padding: 0.3rem 0.6rem;
-  text-align: left;
-  border-bottom: 1px solid rgba(74, 144, 226, 0.1);
-}
+      .metrics-table tr:last-child td {
+        border-bottom: none;
+      }
 
-.metrics-table th {
-  background: rgba(74, 144, 226, 0.1);
-  font-weight: 500;
-  color: var(--primary-color);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-}
+      .message-content {
+        margin-top: 0.5rem;
+      }
 
-.metrics-table tr:last-child td {
-  border-bottom: none;
-}
+      .transcript, .response {
+        margin: 0.5rem 0;
+        line-height: 1.4;
+        font-size: 0.9rem;
+      }
 
-.message-content {
-  margin-top: 0.5rem;
-}
+      .transcript strong, .response strong {
+        color: var(--primary-color);
+      }
 
-.transcript, .response {
-  margin: 0.5rem 0;
-  line-height: 1.4;
-  font-size: 0.9rem;
-}
+      .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.3rem 0.8rem;
+        border-radius: 50px;
+        background: var(--secondary-color);
+        margin-bottom: 0.8rem;
+        align-self: center;
+      }
 
-.transcript strong, .response strong {
-  color: var(--primary-color);
-}
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #ccc;
+      }
 
-.status-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0.8rem;
-  border-radius: 50px;
-  background: var(--secondary-color);
-  margin-bottom: 0.8rem;
-  align-self: center;
-}
+      .status-dot.connected {
+        background-color: #28a745;
+      }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #ccc;
-}
+      .status-dot.disconnected {
+        background-color: #dc3545;
+      }
 
-.status-dot.connected {
-  background-color: #28a745;
-}
-
-.status-dot.disconnected {
-  background-color: #dc3545;
-}
-
-.status-dot.connecting {
-  background-color: #ffc107;
-}
-
+      .status-dot.connecting {
+        background-color: #ffc107;
+      }
     </style>
   </head>
 
   <body>
     <div class="container">
-      <h1>AI Plugin Assistant</h1>
+      <h1>AI Assistant</h1>
 
       <div class="status-indicator">
         <div id="wsStatus" class="status-dot disconnected"></div>
@@ -218,6 +192,7 @@ button.listening {
 
       <div id="conversation">
         <h2>Conversation History</h2>
+        <!-- Initial instructions -->
         <div class="message info">
           <div class="message-content">
             <div class="info-message">
@@ -238,54 +213,40 @@ button.listening {
       const CONFIG = {
         SOCKET_URL: 'ws://localhost:8000/plugin/ws',
         AUDIO_SAMPLE_RATE: 8000,
-        SCRIPT_PROCESSOR_BUFFER_SIZE: 256,
-        INT16_NEGATIVE_MULTIPLIER: 0x8000,
-        INT16_POSITIVE_MULTIPLIER: 0x7FFF,
-        BIAS: 0x84,
-        CLIP: 32635
+        BUFFER_SIZE: 4096
       };
 
       /***** Global Variables *****/
       let socket,
-          pendingAudioChunks = [],
-          isPlaying = false,
-          audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: CONFIG.AUDIO_SAMPLE_RATE });
+          audioContext,
+          mediaStreamSource,
+          scriptProcessor,
+          isRecording = false;
 
-      /***** Utility Functions *****/
-      const generateId = length =>
-        Array.from({ length }, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".charAt(Math.floor(Math.random() * 62))).join('');
-
-      const float32ToInt16 = float32Array =>
-        Int16Array.from(float32Array, s => {
-          s = Math.max(-1, Math.min(1, s));
-          return s < 0 ? s * CONFIG.INT16_NEGATIVE_MULTIPLIER : s * CONFIG.INT16_POSITIVE_MULTIPLIER;
+      /***** Chrome Message Listener *****/
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+        chrome.runtime.onMessage.addListener((message) => {
+          if (message.command === "sendPageContent" && message.content) {
+            const contentEvent = { event: 'pageContent', content: message.content };
+            if (socket && socket.readyState === WebSocket.OPEN) {
+              console.log("sending page content", contentEvent);
+              socket.send(JSON.stringify(contentEvent));
+            } else {
+              console.error("WebSocket is not connected.");
+            }
+          }
         });
-
-      const int16ToMuLaw = int16Array => Uint8Array.from(int16Array, linearToMuLawSample);
-
-      function linearToMuLawSample(sample) {
-        sample = Math.max(-CONFIG.CLIP, Math.min(CONFIG.CLIP, sample));
-        let sign = sample < 0 ? 0x80 : 0;
-        if (sign) sample = -sample;
-        sample += CONFIG.BIAS;
-        const exponent = getExponent(sample);
-        const mantissa = (sample >> (exponent + 3)) & 0x0F;
-        return ~(sign | (exponent << 4) | mantissa);
       }
 
-      function getExponent(sample) {
-        let exponent = 7;
-        for (let expMask = 0x4000; (sample & expMask) === 0 && exponent > 0; exponent--, expMask >>= 1);
-        return exponent;
-      }
-
-      const muLawDecode = muLawByte => {
-        muLawByte = ~muLawByte & 0xFF;
-        const sign = (muLawByte & 0x80) ? -1 : 1;
-        const exponent = (muLawByte & 0x70) >> 4;
-        const mantissa = muLawByte & 0x0F;
-        return sign * (((mantissa << 4) + 8) << exponent);
-      };
+      /***** DOM Setup *****/
+      document.addEventListener('DOMContentLoaded', () => {
+        const talkButton = document.getElementById('talkButton');
+        document.getElementById('connectButton').addEventListener('click', startConversation);
+        document.getElementById('disconnectButton').addEventListener('click', endConversation);
+        talkButton.addEventListener('click', toggleTalking);
+        // Auto-connect on sidebar open
+        startConversation();
+      });
 
       /***** WebSocket Functions *****/
       const updateConnectionStatus = (status, text) => {
@@ -296,44 +257,55 @@ button.listening {
       function startConversation() {
         updateConnectionStatus('connecting', 'Connecting...');
         socket = new WebSocket(CONFIG.SOCKET_URL);
+
         socket.onopen = () => {
           updateConnectionStatus('connected', 'Connected');
         };
+
         socket.onmessage = ({ data }) => {
           const msg = JSON.parse(data);
           switch (msg.type) {
-            case 'result':     handleResultEvent(msg); break;
-            case 'media':      handleMediaEvent(msg); break;
-            case 'mark':       handleMarkEvent(msg); break;
-            case 'stop_speaking': handleClearEvent(); break;
-            case 'start_restream': console.log('Restreaming audio...'); break;
-            case 'start_responding': console.log('AI starting to respond...'); break;
+            case 'media': handleMediaEvent(msg); break;
+            case 'mark': handleMarkEvent(msg); break;
+            case 'result': handleResultEvent(msg); break;
+            case 'start_restream': handleRestreamEvent(); break;
+            case 'start_responding': handleStartRespondingEvent(); break;
+            case 'stop_speaking': handleStopSpeakingEvent(); break;
             default: console.warn('Unknown event type:', msg.type);
           }
         };
+
         socket.onclose = () => {
           updateConnectionStatus('disconnected', 'Disconnected');
           console.log('Disconnected');
         };
       }
 
-      function sendAudioData(base64Buffer) {
-        if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({
-            type: 'media',
-            audio: base64Buffer,
-            sid: generateId(10)
-          }));
-        }
-      }
+      function endConversation() {
+        const button = document.getElementById('talkButton');
+        button.classList.remove('listening');
+        button.textContent = 'Talk to AI Assistant';
 
-      function sendMarkEvent(markId) {
-        if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({
-            type: 'mark',
-            mark_id: markId,
-            sid: generateId(10)
-          }));
+        updateConnectionStatus('disconnected', 'Disconnected');
+
+        // Clean up audio resources
+        isRecording = false;
+        if (scriptProcessor) {
+          scriptProcessor.disconnect();
+          scriptProcessor = null;
+        }
+        if (mediaStreamSource) {
+          mediaStreamSource.disconnect();
+          mediaStreamSource = null;
+        }
+        if (audioContext) {
+          audioContext.close();
+          audioContext = null;
+        }
+
+        if (socket) {
+          socket.send(JSON.stringify({ type: 'stop_speaking' }));
+          socket.close();
         }
       }
 
@@ -345,29 +317,54 @@ button.listening {
 
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: CONFIG.AUDIO_SAMPLE_RATE
+            }
           });
           button.textContent = 'Listening...';
 
-          const localAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: CONFIG.AUDIO_SAMPLE_RATE });
-          const source = localAudioContext.createMediaStreamSource(stream);
-          const processor = localAudioContext.createScriptProcessor(CONFIG.SCRIPT_PROCESSOR_BUFFER_SIZE, 1, 1);
+          // Create audio context and nodes
+          audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: CONFIG.AUDIO_SAMPLE_RATE
+          });
 
-          source.connect(processor);
-          processor.connect(localAudioContext.destination);
+          mediaStreamSource = audioContext.createMediaStreamSource(stream);
+          scriptProcessor = audioContext.createScriptProcessor(CONFIG.BUFFER_SIZE, 1, 1);
+
+          // Connect the nodes
+          mediaStreamSource.connect(scriptProcessor);
+          scriptProcessor.connect(audioContext.destination);
+
+          // Handle audio processing
+          scriptProcessor.onaudioprocess = (e) => {
+            if (!isRecording) return;
+
+            const inputData = e.inputBuffer.getChannelData(0);
+            // Convert Float32Array to Int16Array
+            const int16Data = new Int16Array(inputData.length);
+            for (let i = 0; i < inputData.length; i++) {
+              int16Data[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+            }
+
+            // Convert to base64
+            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(int16Data.buffer)));
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+              const mediaEvent = {
+                type: 'media',
+                audio: base64Audio,
+                sid: generateId(32)
+              };
+              socket.send(JSON.stringify(mediaEvent));
+            }
+          };
+
+          isRecording = true;
           button.dataset.streamActive = "true";
 
-          window.currentAudioStream = stream;
-          window.currentAudioProcessor = processor;
-          window.currentAudioSource = source;
-
-          processor.onaudioprocess = e => {
-            if (button.dataset.streamActive !== "true") return;
-            const inputBuffer = e.inputBuffer.getChannelData(0);
-            const muLawBuffer = int16ToMuLaw(float32ToInt16(inputBuffer));
-            const base64Buffer = btoa(String.fromCharCode(...muLawBuffer));
-            sendAudioData(base64Buffer);
-          };
         } catch (err) {
           console.error('Error accessing audio stream:', err);
           button.classList.remove('listening');
@@ -384,105 +381,82 @@ button.listening {
         }
       }
 
-      function handleMediaEvent({ audio }) {
-        const muLawBytes = Uint8Array.from(atob(audio), c => c.charCodeAt(0));
-        const pcmSamples = Int16Array.from(muLawBytes, muLawDecode);
-        const float32Samples = Float32Array.from(pcmSamples, s => s / 32768);
-        pendingAudioChunks.push({ samples: float32Samples, markId: null });
-        if (!isPlaying) playNextAudio();
-      }
-
-      function handleMarkEvent({ mark_id }) {
-        const unmarked = pendingAudioChunks.find(chunk => chunk.markId === null);
-        if (unmarked) unmarked.markId = mark_id;
-        if (!isPlaying) playNextAudio();
-      }
-
-      function playNextAudio() {
-        if (pendingAudioChunks.length === 0) {
-          isPlaying = false;
-          return;
+      function handleMediaEvent({ audio, sid }) {
+        // Convert base64 to ArrayBuffer
+        const binaryString = atob(audio);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
         }
 
-        const nextIndex = pendingAudioChunks.findIndex(chunk => chunk.markId !== null);
-        if (nextIndex === -1) {
-          isPlaying = false;
-          return;
+        // Create a Float32Array for the audio data
+        const float32Data = new Float32Array(bytes.length / 2);
+
+        // Convert Int16 to Float32, handling the bytes properly
+        for (let i = 0; i < bytes.length / 2; i++) {
+          // Combine two bytes into one 16-bit integer (little-endian)
+          const int16 = (bytes[i * 2] & 0xff) | ((bytes[i * 2 + 1] & 0xff) << 8);
+          // Convert to signed value
+          const signedInt16 = int16 >= 0x8000 ? int16 - 0x10000 : int16;
+          // Normalize to float between -1 and 1
+          float32Data[i] = signedInt16 / 32768.0;
         }
 
-        isPlaying = true;
-        const { samples, markId } = pendingAudioChunks.splice(nextIndex, 1)[0];
+        // Create AudioBuffer with the correct length
+        const audioBuffer = audioContext.createBuffer(1, float32Data.length, CONFIG.AUDIO_SAMPLE_RATE);
+        audioBuffer.getChannelData(0).set(float32Data);
 
-        try {
-          playAudio(samples, () => {
-            sendMarkEvent(markId);
-            playNextAudio();
-          });
-        } catch (err) {
-          console.error('Error playing audio:', err);
-          playNextAudio(); // Try to continue with next chunk
-        }
-      }
-
-      function playAudio(samples, callback) {
-        // Resume audioContext if it's suspended
-        if (audioContext.state === 'suspended') {
-          audioContext.resume();
-        }
-
-        const buffer = audioContext.createBuffer(1, samples.length, CONFIG.AUDIO_SAMPLE_RATE);
-        buffer.copyToChannel(samples, 0);
+        // Play the audio
         const source = audioContext.createBufferSource();
-        source.buffer = buffer;
+        source.buffer = audioBuffer;
         source.connect(audioContext.destination);
-        source.onended = callback;
         source.start(0);
       }
 
-      function stopAudio() {
-        pendingAudioChunks = [];
-        if (audioContext && audioContext.state !== 'closed') {
-          audioContext.close().then(() => {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: CONFIG.AUDIO_SAMPLE_RATE });
-          }).catch(err => console.error('Error closing audio context:', err));
-        }
-        isPlaying = false;
+      function handleMarkEvent({ mark_id, sid }) {
+        // Handle mark events if needed
       }
 
-      function endConversation() {
-        const button = document.getElementById('talkButton');
-        button.classList.remove('listening');
-        button.textContent = 'Talk to AI Assistant';
-        button.dataset.streamActive = "false";
-
-        updateConnectionStatus('disconnected', 'Disconnected');
-
-        if (window.currentAudioStream) {
-          window.currentAudioStream.getTracks().forEach(track => track.stop());
-          window.currentAudioStream = null;
-        }
-        if (window.currentAudioSource) {
-          window.currentAudioSource.disconnect();
-          window.currentAudioSource = null;
-        }
-        if (window.currentAudioProcessor) {
-          window.currentAudioProcessor.disconnect();
-          window.currentAudioProcessor = null;
-        }
-        if (socket) {
-          socket.close();
-        }
+      function handleResultEvent({ result }) {
+        const timings = [
+          { label: 'Speech-to-Text', value: result.stt_duration, unit: 's' },
+          { label: 'AI Processing', value: result.llm_duration, unit: 's' },
+          { label: 'Text-to-Speech', value: result.tts_duration, unit: 's' },
+          { label: 'First Chunk', value: result.first_chunk_time, unit: 's' },
+          { label: 'Total Duration', value: result.total_duration, unit: 's' }
+        ];
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message';
+        messageDiv.innerHTML = `
+          <table class="metrics-table">
+            <thead><tr><th>Metric</th><th>Duration</th></tr></thead>
+            <tbody>${timings.map(t => `<tr><td>${t.label}</td><td>${t.value.toLocaleString()} ${t.unit}</td></tr>`).join('')}</tbody>
+          </table>
+          <div class="message-content">
+            <div class="transcript"><strong>You:</strong> ${result.transcript}</div>
+            <div class="response"><strong>Assistant:</strong> ${result.response}</div>
+          </div>`;
+        document.getElementById('conversation').appendChild(messageDiv);
+        messageDiv.scrollIntoView({ behavior: 'smooth' });
       }
 
-      function sendMarksForRemainingChunks() {
-        pendingAudioChunks.forEach(chunk => {
-          const markId = chunk.markId || generateId(10);
-          chunk.markId = markId;
-          sendMarkEvent(markId);
-        });
-        pendingAudioChunks = [];
+      function handleRestreamEvent() {
+        // Handle restream event if needed
       }
 
+      function handleStartRespondingEvent() {
+        // Handle start responding event if needed
+      }
+
+      function handleStopSpeakingEvent() {
+        // Handle stop speaking event if needed
+      }
+
+      /***** Utility Functions *****/
+      const generateId = length =>
+        Array.from({ length }, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".charAt(Math.floor(Math.random() * 62))).join('');
+
+      /***** Toggle Talking *****/
       function toggleTalking() {
         const button = document.getElementById('talkButton');
         if (button.classList.contains('listening')) {
@@ -494,57 +468,6 @@ button.listening {
           startStream();
         }
       }
-
-      /***** Result and Event Handlers *****/
-      function handleResultEvent({ result }) {
-        const stt = result.stt_result;
-        const llm = result.llm_result;
-        const tts = result.tts_result;
-
-        // Calculate durations
-        const sttDuration = stt.stt_end_time - stt.stt_start_time;
-        const llmDuration = llm.end_time - llm.start_time;
-        const ttsDuration = tts.end_time - tts.start_time;
-        const totalDuration = ttsDuration + llmDuration + sttDuration;
-        const firstTTSChunk = tts.first_chunk_time - tts.start_time;
-
-        const timings = [
-          { label: 'Speech-to-Text', value: sttDuration.toFixed(2), unit: 's' },
-          { label: 'LLM', value: llmDuration.toFixed(2), unit: 's' },
-          { label: 'Text-to-Speech', value: ttsDuration.toFixed(2), unit: 's' },
-          { label: 'First Chunk', value: firstTTSChunk.toFixed(2), unit: 's' },
-          { label: 'Total Duration', value: totalDuration.toFixed(2), unit: 's' }
-        ];
-
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'message';
-        messageDiv.innerHTML = `
-          <table class="metrics-table">
-            <thead><tr><th>Metric</th><th>Duration</th></tr></thead>
-            <tbody>${timings.map(t => `<tr><td>${t.label}</td><td>${t.value} ${t.unit}</td></tr>`).join('')}</tbody>
-          </table>
-          <div class="message-content">
-            <div class="transcript"><strong>You:</strong> ${stt.transcript}</div>
-            <div class="response"><strong>Assistant:</strong> ${llm.response}</div>
-          </div>`;
-        document.getElementById('conversation').appendChild(messageDiv);
-        messageDiv.scrollIntoView({ behavior: 'smooth' });
-      }
-
-      function handleClearEvent() {
-        sendMarksForRemainingChunks();
-        stopAudio();
-      }
-
-      /***** Initialize *****/
-      document.addEventListener('DOMContentLoaded', () => {
-        const talkButton = document.getElementById('talkButton');
-        document.getElementById('connectButton').addEventListener('click', startConversation);
-        document.getElementById('disconnectButton').addEventListener('click', endConversation);
-        talkButton.addEventListener('click', toggleTalking);
-        // Auto-connect on page load
-        startConversation();
-      });
     </script>
   </body>
 </html>
