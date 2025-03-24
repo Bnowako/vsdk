@@ -29,6 +29,7 @@ class Config:
         model: str = "eleven_turbo_v2_5"
         voice: str = "Xb7hH8MSUJpSbSDYk0k2"
         output_format: str = "ulaw_8000"
+        language: str = "pl"
 
         def with_model(self, model: str):
             self.model = model

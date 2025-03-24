@@ -86,7 +86,7 @@ class ElevenTTSProcessor:
         audio_queue: asyncio.Queue[AudioChunk | None] = asyncio.Queue()
 
         async def send_and_listen():
-            uri = f"wss://api.elevenlabs.io/v1/text-to-speech/{self.eleven.voice}/stream-input?model_id=eleven_turbo_v2_5&output_format=ulaw_8000&language_code=pl"
+            uri = f"wss://api.elevenlabs.io/v1/text-to-speech/{self.eleven.voice}/stream-input?model_id={self.eleven.model}&output_format={self.eleven.output_format}&language_code={self.eleven.language}"
 
             async with websockets.connect(uri) as websocket:
                 await websocket.send(
