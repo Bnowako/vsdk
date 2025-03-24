@@ -1,7 +1,7 @@
 import logging
 import time
 from collections.abc import Callable
-from typing import AsyncGenerator
+from typing import AsyncIterator
 
 from app.config import Config
 from app.voice_agent.domain import (
@@ -11,7 +11,7 @@ from app.voice_agent.domain import (
 )
 from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
 from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
-from app.voice_agent.ttt.OpenAIAgent import OpenAIAgent
+from app.voice_agent.ttt.base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class VoiceAgent:
         self,
         stt: GroqSTTProcessor,
         tts: ElevenTTSProcessor,
-        agent: OpenAIAgent,
+        agent: BaseAgent,
     ) -> None:
         self.stt = stt
         self.tts = tts
@@ -32,7 +32,7 @@ class VoiceAgent:
         pcm_audio_buffer: bytes,
         sid: str,
         callback: Callable[[RespondToHumanResult], None],
-    ) -> AsyncGenerator[bytes, None]:
+    ) -> AsyncIterator[bytes]:
         logger.info(
             f"Human speach detected, triggering response flow. PCM buffer duration {len(pcm_audio_buffer) // Config.Audio.bytes_per_sample / Config.Audio.sample_rate}s"
         )

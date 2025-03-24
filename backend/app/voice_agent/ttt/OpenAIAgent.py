@@ -4,7 +4,7 @@ Langchain agent
 
 import logging
 import time
-from typing import AsyncGenerator, Callable, List, Optional
+from typing import AsyncIterator, Callable, List, Optional
 
 from langchain.chat_models.base import BaseChatModel
 from langchain_core.messages import (
@@ -18,6 +18,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 
 from app.voice_agent.domain import LLMResult, STTResult
+from app.voice_agent.ttt.base import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ def what_day_and_time_is_it():
     return time.strftime("%A %H:%M:%S", time.localtime())
 
 
-class OpenAIAgent:
+class OpenAIAgent(BaseAgent):
     def __init__(self, llm: BaseChatModel, system_prompt: str) -> None:
         self.llm = llm
         self.system_prompt = system_prompt
@@ -46,7 +47,7 @@ class OpenAIAgent:
         stt_result: STTResult,
         conversation_id: str,
         callback: Optional[Callable[[LLMResult], None]] = None,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncIterator[str]:
         return self.astream(stt_result, conversation_id, callback)
 
     async def astream(
@@ -54,7 +55,7 @@ class OpenAIAgent:
         stt_result: STTResult,
         conversation_id: str,
         callback: Optional[Callable[[LLMResult], None]] = None,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncIterator[str]:
         logger.error("Starting astream")
 
         start_time = time.time()

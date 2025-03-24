@@ -2,7 +2,7 @@ import asyncio
 import base64
 import dataclasses
 import json
-from typing import AsyncGenerator, Iterator, List, Optional, Tuple
+from typing import AsyncIterator, Iterator, List, Optional, Tuple
 
 import websockets
 
@@ -67,9 +67,7 @@ class ElevenTTSProcessor:
     ):
         self.eleven = eleven
 
-    def __call__(
-        self, input_generator: AsyncGenerator[str, None]
-    ) -> AsyncGenerator[bytes, None]:
+    def __call__(self, input_generator: AsyncIterator[str]) -> AsyncIterator[bytes]:
         return self.text_to_speech_streaming_ws(input_generator)
 
     def text_to_speech_streaming(self, text: str) -> Iterator[bytes]:
@@ -83,8 +81,8 @@ class ElevenTTSProcessor:
         return response
 
     async def text_to_speech_streaming_ws(
-        self, input_generator: AsyncGenerator[str, None]
-    ) -> AsyncGenerator[bytes, None]:
+        self, input_generator: AsyncIterator[str]
+    ) -> AsyncIterator[bytes]:
         audio_queue: asyncio.Queue[AudioChunk | None] = asyncio.Queue()
 
         async def send_and_listen():
@@ -159,7 +157,7 @@ class ElevenTTSProcessor:
 
         await send_task  # Ensure send_and_listen() completes
 
-    async def _text_chunker(self, chunks: AsyncGenerator[str, None]):
+    async def _text_chunker(self, chunks: AsyncIterator[str]):
         """Split text into chunks, ensuring to not break sentences."""
         splitters = (
             ".",

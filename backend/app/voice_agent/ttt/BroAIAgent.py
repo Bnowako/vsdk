@@ -1,10 +1,16 @@
 import logging
 import time
-from typing import Annotated, AsyncIterator, TypedDict
+from typing import Annotated, AsyncIterator, Callable, Optional, TypedDict
 
 from dotenv import load_dotenv
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from langchain_core.tools import tool  # type: ignore
+from langchain.chat_models.base import BaseChatModel
+from langchain_core.messages import (
+    AIMessageChunk,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+)
+from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START
@@ -18,6 +24,8 @@ from app.chat.stagehand_tools import (
     observe_elements,
     perform_action,
 )
+from app.voice_agent.domain import LLMResult, STTResult
+from app.voice_agent.ttt.base import BaseAgent
 
 load_dotenv()
 
@@ -34,13 +42,13 @@ def what_day_and_time_is_it():
     return time.strftime("%A %H:%M:%S", time.localtime())
 
 
-class LLMAgent:
+class BroAgent(BaseAgent):
     def __init__(
         self,
+        llm: BaseChatModel = ChatOpenAI(model="gpt-4o"),
     ) -> None:
         logger.info("Initializing LLMAgent")
         in_memory_store = MemorySaver()
-        llm = ChatOpenAI(model="gpt-4o")
         llm_with_tools = llm.bind_tools(  # type: ignore
             [
                 what_day_and_time_is_it,
@@ -106,13 +114,50 @@ Speak only in Polish.
             checkpointer=in_memory_store,
         )  # type: ignore
 
+    def __call__(
+        self,
+        stt_result: STTResult,
+        conversation_id: str,
+        callback: Optional[Callable[[LLMResult], None]] = None,
+    ) -> AsyncIterator[str]:
+        return self.astream(stt_result, conversation_id, callback)
+
     async def astream(
-        self, user_query: str, conversation_id: str
-    ) -> AsyncIterator[BaseMessage]:
-        async for event in self.graph.astream(  # type: ignore
-            input={"messages": [HumanMessage(content=user_query)]},
+        self,
+        stt_result: STTResult,
+        conversation_id: str,
+        callback: Optional[Callable[[LLMResult], None]] = None,
+    ) -> AsyncIterator[str]:
+        logger.error("Starting astream")
+
+        start_time = time.time()
+        first_chunk_time = None
+        full_response = ""
+
+        async for msg, _ in self.graph.astream(
+            stream_mode="messages",
+            input={"messages": [HumanMessage(content=stt_result.transcript)]},
             config={"configurable": {"thread_id": conversation_id}},
-            stream_mode="values",
         ):
-            logger.info(f"Yielding Event: {event}")
-            yield event["messages"][-1]
+            if isinstance(msg, AIMessageChunk):
+                # Record the time to first chunk
+                if first_chunk_time is None:
+                    first_chunk_time = time.time() - start_time
+
+                # Accumulate the full response
+                content: str = msg.content  # type: ignore
+                full_response += content
+
+                # Yield the content chunk
+                yield content
+
+        # Invoke the callback once at the end with all the data
+        if callback:
+            callback(
+                LLMResult(
+                    start_time=start_time,
+                    end_time=time.time(),
+                    first_chunk_time=first_chunk_time if first_chunk_time else 0,
+                    response=full_response,
+                )
+            )

@@ -3,6 +3,9 @@ import json
 import logging
 import uuid
 
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from starlette.templating import Jinja2Templates
+
 from app.audio.audio_utils import mulaw_to_pcm
 from app.voice_agent.conversation.domain import (
     ConversationEvent,
@@ -11,19 +14,16 @@ from app.voice_agent.conversation.domain import (
     MediaEvent,
 )
 from app.voice_agent.conversation_container import ConversationContainer
-from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
-from starlette.templating import Jinja2Templates
+from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
+from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
+from app.voice_agent.ttt.BroAIAgent import BroAgent
+from app.voice_agent.voice_agent import VoiceAgent
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-router = APIRouter(prefix="/plugin", tags=["plugin"])
+router = APIRouter(prefix="/bro", tags=["bro"])
 templates = Jinja2Templates(directory="templates")
-
-
-@router.get("/")
-async def index(request: Request):
-    return templates.TemplateResponse("plugin.html", {"request": request})
 
 
 @router.websocket("/ws")
@@ -38,6 +38,11 @@ async def websocket_endpoint(websocket: WebSocket):
     conversation_container: ConversationContainer = ConversationContainer(
         conversation_id=str(uuid.uuid4()),
         callback=conversation_events_handler,
+        voice_agent=VoiceAgent(
+            tts=ElevenTTSProcessor(),
+            stt=GroqSTTProcessor(),
+            agent=BroAgent(),
+        ),
     )
     try:
         while True:
