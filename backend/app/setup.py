@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Dict
 
+from fastapi.staticfiles import StaticFiles
 import motor.motor_asyncio
 from beanie.odm.utils.init import init_beanie  # type: ignore
 from fastapi import FastAPI
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(twilio_router)
     app.include_router(plugin_router)
     app.include_router(chat_router)
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
     app.add_middleware(
         CORSMiddleware,
