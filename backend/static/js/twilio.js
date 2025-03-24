@@ -15,21 +15,6 @@ let socket,
     isPlaying = false,
     audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: CONFIG.AUDIO_SAMPLE_RATE });
 
-/***** Chrome Message Listener *****/
-// This is only applicable if running as a Chrome extension.
-if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
-    chrome.runtime.onMessage.addListener((message) => {
-        if (message.command === "sendPageContent" && message.content) {
-            const contentEvent = { event: 'pageContent', content: message.content };
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                console.log("sending page content", contentEvent);
-                socket.send(JSON.stringify(contentEvent));
-            } else {
-                console.error("WebSocket is not connected.");
-            }
-        }
-    });
-}
 
 /***** DOM Setup *****/
 document.addEventListener('DOMContentLoaded', () => {
@@ -125,9 +110,9 @@ function endConversation() {
         window.currentAudioSource.disconnect();
         window.currentAudioSource = null;
     }
-    if (window.currentAudioProcessor) {
-        window.currentAudioProcessor.disconnect();
-        window.currentAudioProcessor = null;
+    if (window.currentAudioWorklet) {
+        window.currentAudioWorklet.disconnect();
+        window.currentAudioWorklet = null;
     }
     if (socket) {
         socket.send(JSON.stringify({ event: 'closed' }));
@@ -148,25 +133,34 @@ async function startStream() {
         button.textContent = 'Listening...';
 
         const localAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: CONFIG.AUDIO_SAMPLE_RATE });
-        const source = localAudioContext.createMediaStreamSource(stream);
-        const processor = localAudioContext.createScriptProcessor(CONFIG.SCRIPT_PROCESSOR_BUFFER_SIZE, 1, 1);
 
-        source.connect(processor);
-        processor.connect(localAudioContext.destination);
+        // Load and register the audio worklet
+        await localAudioContext.audioWorklet.addModule('/api/static/js/audio-processor.js');
+
+        const source = localAudioContext.createMediaStreamSource(stream);
+        const workletNode = new AudioWorkletNode(localAudioContext, 'audio-processor');
+
+        // Handle processed audio data
+        workletNode.port.onmessage = (event) => {
+            if (button.dataset.streamActive !== "true") return;
+
+            const muLawBuffer = event.data.audioData;
+            const base64Buffer = btoa(String.fromCharCode(...muLawBuffer));
+            const mediaEvent = { event: 'media', media: { payload: base64Buffer } };
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify(mediaEvent));
+            }
+        };
+
+        source.connect(workletNode);
+        workletNode.connect(localAudioContext.destination);
         button.dataset.streamActive = "true";
 
         window.currentAudioStream = stream;
-        window.currentAudioProcessor = processor;
+        window.currentAudioWorklet = workletNode;
         window.currentAudioSource = source;
 
-        processor.onaudioprocess = e => {
-            if (button.dataset.streamActive !== "true") return;
-            const inputBuffer = e.inputBuffer.getChannelData(0);
-            const muLawBuffer = int16ToMuLaw(float32ToInt16(inputBuffer));
-            const base64Buffer = btoa(String.fromCharCode(...muLawBuffer));
-            const mediaEvent = { event: 'media', media: { payload: base64Buffer } };
-            if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(mediaEvent));
-        };
     } catch (err) {
         console.error('Error accessing audio stream:', err);
         button.classList.remove('listening');
