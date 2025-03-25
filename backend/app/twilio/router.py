@@ -17,7 +17,7 @@ from app.twilio.schemas import (
     TwilioStartEvent,
 )
 from app.voice_agent.conversation.domain import ConversationEvent
-from app.voice_agent.conversation_container import ConversationContainer
+from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
 from app.voice_agent.domain import RespondToHumanResult
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ async def websocket_endpoint(websocket: WebSocket):
     logger.info("Connection accepted")
 
     sid = ""
-    conversation_container: ConversationContainer | None = None
+    conversation_container: ConversationOrchestrator | None = None
     try:
         while True:
             try:
@@ -64,7 +64,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     async def conversation_events_handler(x: ConversationEvent):
                         await handle_conversation_event(x, websocket)
 
-                    conversation_container = ConversationContainer(
+                    conversation_container = ConversationOrchestrator(
                         conversation_id=sid,
                         callback=conversation_events_handler,
                     )

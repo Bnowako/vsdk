@@ -28,7 +28,7 @@ class Config:
         model: str = "eleven_flash_v2_5"
         voice: str = "Xb7hH8MSUJpSbSDYk0k2"
         output_format: str = "pcm_16000"  # for twilio use ulaw8000
-        language: str = "pl"
+        language: str = "en"
 
         def with_model(self, model: str):
             self.model = model
@@ -37,7 +37,7 @@ class Config:
     class Groq:
         async_client: AsyncGroq = AsyncGroq(api_key=Secrets.GROQ_API_KEY)
         transcription_model: str = "whisper-large-v3-turbo"
-        transcription_language: str = "pl"
+        transcription_language: str = "en"
 
         def with_transcription_model(self, model: str):
             self.transcription_model = model

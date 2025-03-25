@@ -13,7 +13,7 @@ from app.voice_agent.conversation.domain import (
     MarkEvent,
     MediaEvent,
 )
-from app.voice_agent.conversation_container import ConversationContainer
+from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
 from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
 from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
 from app.voice_agent.ttt.BroAIAgent import BroAgent
@@ -35,7 +35,7 @@ async def websocket_endpoint(websocket: WebSocket):
     async def conversation_events_handler(x: ConversationEvent):
         await handle_conversation_event(x, websocket)
 
-    conversation_container: ConversationContainer = ConversationContainer(
+    conversation_container: ConversationOrchestrator = ConversationOrchestrator(
         conversation_id=str(uuid.uuid4()),
         callback=conversation_events_handler,
         voice_agent=VoiceAgent(

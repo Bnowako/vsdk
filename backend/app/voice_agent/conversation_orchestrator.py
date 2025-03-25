@@ -14,7 +14,7 @@ from app.voice_agent.ttt.OpenAIAgent import OpenAIAgent
 from app.voice_agent.voice_agent import VoiceAgent
 
 
-class ConversationContainer:
+class ConversationOrchestrator:
     def __init__(
         self,
         conversation_id: str,

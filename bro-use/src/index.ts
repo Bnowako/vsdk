@@ -19,7 +19,7 @@ async function main() {
     await stagehand.init();
     const page = stagehand.page;
     const context = stagehand.context;
-    await page.goto("https://bnowako.com");
+    await page.goto("https://google.com");
 
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);

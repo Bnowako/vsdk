@@ -13,7 +13,7 @@ from app.voice_agent.conversation.domain import (
     MarkEvent,
     MediaEvent,
 )
-from app.voice_agent.conversation_container import ConversationContainer
+from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
 from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
 from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
 from app.voice_agent.ttt.BroAIAgent import BroAgent
@@ -40,7 +40,7 @@ async def websocket_endpoint(websocket: WebSocket):
     async def conversation_events_handler(x: ConversationEvent):
         await handle_conversation_event(x, websocket)
 
-    conversation_container: ConversationContainer = ConversationContainer(
+    conversation_orchestrator: ConversationOrchestrator = ConversationOrchestrator(
         conversation_id=str(uuid.uuid4()),
         callback=conversation_events_handler,
         voice_agent=VoiceAgent(
@@ -62,14 +62,14 @@ async def websocket_endpoint(websocket: WebSocket):
                     case "media":
                         media_event = MediaEvent(**data)
                         decoded_audio = base64.b64decode(media_event.audio)
-                        conversation_container.audio_received(decoded_audio)
+                        conversation_orchestrator.audio_received(decoded_audio)
                     case "mark":
                         mark_event = MarkEvent(**data)
                         chunk_idx = mark_event.mark_id.split("_")[-1]
                         speech_idx = mark_event.mark_id.split("_")[-2]
                         logger.debug(f"Mark Message received {message}")
 
-                        conversation_container.agent_speech_marked(
+                        conversation_orchestrator.agent_speech_marked(
                             speech_idx=int(speech_idx), chunk_idx=int(chunk_idx)
                         )
                     case _:
@@ -79,9 +79,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 break
     finally:
         logger.info(
-            f"Cleaning up conversation {conversation_container.conversation.id}"
+            f"Cleaning up conversation {conversation_orchestrator.conversation.id}"
         )
-        conversation_container.end_conversation()
+        conversation_orchestrator.end_conversation()
 
     logger.info("Connection closed.")
 

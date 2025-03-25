@@ -29,7 +29,6 @@ class GroqSTTProcessor:
         transcription = await self.groq.async_client.audio.transcriptions.create(
             file=("audio.wav", wav_io),
             model=self.groq.transcription_model,
-            prompt="Audio klip jest częścią konwersacji w której pacjent dzwoni do lekarza rodzinnego",
             language=self.groq.transcription_language,
         )
         stt_end_time = time.time()

@@ -23,7 +23,8 @@ dependencies = [
     "silero-vad==5.1.2",
     "langchain-mcp-adapters>=0.0.5",
     "pydub==0.25.1",
-    "ffmpeg==1.4"
+    "ffmpeg==1.4",
+    "av==14.2.0"
 ]
 
 
