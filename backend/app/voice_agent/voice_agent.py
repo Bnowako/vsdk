@@ -10,7 +10,7 @@ from app.voice_agent.domain import (
     TTSResult,
 )
 from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
-from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
+from app.voice_agent.tts.ElevenTTSProcessor import AudioChunk, ElevenTTSProcessor
 from app.voice_agent.ttt.base import BaseAgent
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class VoiceAgent:
         pcm_audio_buffer: bytes,
         sid: str,
         callback: Callable[[RespondToHumanResult], None],
-    ) -> AsyncIterator[bytes]:
+    ) -> AsyncIterator[AudioChunk]:
         logger.info(
             f"Human speach detected, triggering response flow. PCM buffer duration {len(pcm_audio_buffer) // Config.Audio.bytes_per_sample / Config.Audio.sample_rate}s"
         )
@@ -59,7 +59,7 @@ class VoiceAgent:
                     tts_result.first_chunk_time = time.time()
                 yield chunk
         except Exception as e:
-            logger.error(f"Exception in agent response: {e}")
+            logger.error(f"Exception in agent response: {e}", exc_info=True)
         tts_result.end_time = time.time()
 
         logger.info("LLM reulsts: %s", llm_result)

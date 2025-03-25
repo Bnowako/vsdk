@@ -23,6 +23,7 @@ class NormalizedAlignment:
 @dataclasses.dataclass
 class AudioChunk:
     audio: bytes
+    base64_audio: str
     normalized_alignment: Optional[NormalizedAlignment]
 
 
@@ -72,7 +73,9 @@ class ElevenTTSProcessor:
         self.eleven = eleven
         logger.info(f"Initialized ElevenTTSProcessor with voice ID: {eleven.voice}")
 
-    def __call__(self, input_generator: AsyncIterator[str]) -> AsyncIterator[bytes]:
+    def __call__(
+        self, input_generator: AsyncIterator[str]
+    ) -> AsyncIterator[AudioChunk]:
         logger.debug("Starting text-to-speech streaming via websocket")
         return self.text_to_speech_streaming_ws(input_generator)
 
@@ -93,13 +96,13 @@ class ElevenTTSProcessor:
 
     async def text_to_speech_streaming_ws(
         self, input_generator: AsyncIterator[str]
-    ) -> AsyncIterator[bytes]:
+    ) -> AsyncIterator[AudioChunk]:
         logger.debug("Starting websocket streaming session")
         audio_queue: asyncio.Queue[AudioChunk | None] = asyncio.Queue()
 
         async def send_and_listen():
-            uri = f"wss://api.elevenlabs.io/v1/text-to-speech/{self.eleven.voice}/stream-input?model_id={self.eleven.model}&output_format={self.eleven.output_format}&language_code={self.eleven.language}"
-            logger.debug(f"Connecting to websocket at: {uri}")
+            uri = f"wss://api.elevenlabs.io/v1/text-to-speech/{self.eleven.voice}/stream-input?model_id={self.eleven.model}&output_format={self.eleven.output_format}&language_code={self.eleven.language}&enable_logging=true"
+            logger.info(f"Connecting to websocket at: {uri}")
 
             try:
                 async with websockets.connect(uri) as websocket:
@@ -143,6 +146,7 @@ class ElevenTTSProcessor:
                                     await audio_queue.put(
                                         AudioChunk(
                                             audio=audio_data,
+                                            base64_audio=data["audio"],
                                             normalized_alignment=alignment,
                                         )
                                     )
@@ -177,12 +181,26 @@ class ElevenTTSProcessor:
         send_task = asyncio.create_task(send_and_listen())
 
         try:
+            whole_audio: bytes = b""
             while True:
                 audio_chunk = await audio_queue.get()
                 if audio_chunk is None:
                     logger.debug("Received None chunk, ending stream")
+                    # num_channels = 1  # e.g., 1 for mono, 2 for stereo
+                    # sample_width = 2  # in bytes (2 bytes = 16-bit audio)
+                    # frame_rate = 16000  # sampling frequency in Hz
+
+                    # # Create a new wave file and write the PCM data
+                    # with wave.open("output.wav", "wb") as wav_file:
+                    #     wav_file.setnchannels(num_channels)
+                    #     wav_file.setsampwidth(sample_width)
+                    #     wav_file.setframerate(frame_rate)
+                    #     wav_file.writeframes(whole_audio)
                     break
-                yield audio_chunk.audio
+                ## save audio chunk to file
+                whole_audio += audio_chunk.audio
+                yield audio_chunk
+
                 # TODO uncomment this
                 # for word_audio_chunk in split_by_words_or_by_fixed_interval_if_silence(
                 #     audio_chunk

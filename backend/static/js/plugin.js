@@ -1,7 +1,8 @@
 /***** Configuration Constants *****/
 const CONFIG = {
-    SOCKET_URL: 'ws://localhost:8000/twilio/ws',
+    SOCKET_URL: 'ws://localhost:8000/plugin/ws',
     AUDIO_SAMPLE_RATE: 8000,
+    AI_VOICE_SAMPLE_RATE: 16000,
     SCRIPT_PROCESSOR_BUFFER_SIZE: 256,
     INT16_NEGATIVE_MULTIPLIER: 0x8000, // 32768
     INT16_POSITIVE_MULTIPLIER: 0x7FFF, // 32767
@@ -13,7 +14,7 @@ const CONFIG = {
 let socket,
     pendingAudioChunks = [],
     isPlaying = false,
-    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: CONFIG.AUDIO_SAMPLE_RATE });
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: CONFIG.AI_VOICE_SAMPLE_RATE });
 
 
 /***** DOM Setup *****/
@@ -30,37 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const generateId = length =>
     Array.from({ length }, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".charAt(Math.floor(Math.random() * 62))).join('');
 
-const float32ToInt16 = float32Array =>
-    Int16Array.from(float32Array, s => {
-        s = Math.max(-1, Math.min(1, s));
-        return s < 0 ? s * CONFIG.INT16_NEGATIVE_MULTIPLIER : s * CONFIG.INT16_POSITIVE_MULTIPLIER;
-    });
 
-const int16ToMuLaw = int16Array => Uint8Array.from(int16Array, linearToMuLawSample);
-
-function linearToMuLawSample(sample) {
-    sample = Math.max(-CONFIG.CLIP, Math.min(CONFIG.CLIP, sample));
-    let sign = sample < 0 ? 0x80 : 0;
-    if (sign) sample = -sample;
-    sample += CONFIG.BIAS;
-    const exponent = getExponent(sample);
-    const mantissa = (sample >> (exponent + 3)) & 0x0F;
-    return ~(sign | (exponent << 4) | mantissa);
-}
-
-function getExponent(sample) {
-    let exponent = 7;
-    for (let expMask = 0x4000; (sample & expMask) === 0 && exponent > 0; exponent--, expMask >>= 1);
-    return exponent;
-}
-
-const muLawDecode = muLawByte => {
-    muLawByte = ~muLawByte & 0xFF;
-    const sign = (muLawByte & 0x80) ? -1 : 1;
-    const exponent = (muLawByte & 0x70) >> 4;
-    const mantissa = muLawByte & 0x0F;
-    return sign * (((mantissa << 4) + 8) << exponent);
-};
 
 /***** WebSocket Functions *****/
 const updateConnectionStatus = (status, text) => {
@@ -73,19 +44,18 @@ function startConversation() {
     socket = new WebSocket(CONFIG.SOCKET_URL);
     socket.onopen = () => {
         updateConnectionStatus('connected', 'Connected');
-        socket.send(JSON.stringify({
-            event: 'start',
-            start: { streamSid: generateId(32), accountSid: generateId(32), callSid: generateId(32) }
-        }));
     };
     socket.onmessage = ({ data }) => {
         const msg = JSON.parse(data);
-        switch (msg.event) {
+        console.log("Received event:", msg.type);
+        switch (msg.type) {
             case 'result': handleResultEvent(msg); break;
             case 'media': handleMediaEvent(msg); break;
             case 'mark': handleMarkEvent(msg); break;
-            case 'clear': handleClearEvent(); break;
-            default: console.warn('Unknown event:', msg.event);
+            case 'stop_speaking': handleStopSpeakingEvent(); break;
+            case 'start_restream': handleRestreamEvent(); break;
+            case 'start_responding': handleStartRespondingEvent(); break;
+            default: console.warn('Unknown event:', msg.type);
         }
     };
     socket.onclose = () => {
@@ -140,13 +110,24 @@ async function startStream() {
         const source = localAudioContext.createMediaStreamSource(stream);
         const workletNode = new AudioWorkletNode(localAudioContext, 'audio-processor');
 
-        // Handle processed audio data
+        // Helper function to convert a Uint8Array to a base64 encoded string.
+        function uint8ToBase64(uint8Array) {
+            let binary = "";
+            for (let i = 0; i < uint8Array.byteLength; i++) {
+            binary += String.fromCharCode(uint8Array[i]);
+            }
+            return btoa(binary);
+        }
+
         workletNode.port.onmessage = (event) => {
             if (button.dataset.streamActive !== "true") return;
 
-            const muLawBuffer = event.data.mulawBuffer;
-            const base64Buffer = btoa(String.fromCharCode(...muLawBuffer));
-            const mediaEvent = { event: 'media', media: { payload: base64Buffer } };
+            const mediaEvent = {
+                type: 'media',
+                audio: uint8ToBase64(event.data.uint8Buffer),
+                base64_audio: uint8ToBase64(event.data.uint8Buffer),
+                sid: generateId(32)
+            };
 
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify(mediaEvent));
@@ -177,17 +158,40 @@ async function startStream() {
     }
 }
 
-function handleMediaEvent({ media: { payload } }) {
-    const muLawBytes = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
-    const pcmSamples = Int16Array.from(muLawBytes, muLawDecode);
-    const float32Samples = Float32Array.from(pcmSamples, s => s / 32768);
+function base64ToArrayBuffer(base64) {
+    const binaryString = window.atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+function handleMediaEvent({  audio  }) {
+    const pcmBytes = base64ToArrayBuffer(audio);
+    console.log("ArrayBuffer byteLength:", pcmBytes.byteLength);
+    if (pcmBytes.byteLength % 2 !== 0) {
+        console.warn("Unexpected PCM data length, not a multiple of 2!");
+    }
+    const pcmSamples = new Int16Array(pcmBytes);
+    console.log("First few samples:", pcmSamples.slice(0, 10));
+
+    // Convert samples to floats.
+    const float32Samples = new Float32Array(pcmSamples.length);
+    for (let i = 0; i < pcmSamples.length; i++) {
+        // Use proper normalization: negative samples divided by 32768, positive by 32767.
+        const s = pcmSamples[i];
+        float32Samples[i] = s < 0 ? s / 32768 : s / 32767;
+    }
+
     pendingAudioChunks.push({ samples: float32Samples, markId: null });
     if (!isPlaying) playNextAudio();
 }
 
-function handleMarkEvent({ mark: { name } }) {
+function handleMarkEvent({ mark_id }) {
     const unmarked = pendingAudioChunks.find(chunk => chunk.markId === null);
-    if (unmarked) unmarked.markId = name;
+    if (unmarked) unmarked.markId = mark_id;
     if (!isPlaying) playNextAudio();
 }
 
@@ -203,7 +207,7 @@ function playNextAudio() {
 }
 
 function playAudio(samples, callback) {
-    const buffer = audioContext.createBuffer(1, samples.length, CONFIG.AUDIO_SAMPLE_RATE);
+    const buffer = audioContext.createBuffer(1, samples.length, CONFIG.AI_VOICE_SAMPLE_RATE);
     buffer.copyToChannel(samples, 0);
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
@@ -213,14 +217,18 @@ function playAudio(samples, callback) {
 }
 
 function sendMarkEventToServer(markId) {
-    socket.send(JSON.stringify({ event: 'mark', mark: { name: markId } }));
+    socket.send(JSON.stringify({
+        type: 'mark',
+        mark_id: markId,
+        sid: generateId(32)
+    }));
 }
 
 function stopAudio() {
     pendingAudioChunks = [];
     if (audioContext && audioContext.state !== 'closed') {
         audioContext.close().then(() => {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: CONFIG.AUDIO_SAMPLE_RATE });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: CONFIG.AI_VOICE_SAMPLE_RATE });
         }).catch(err => console.error('Error closing audio context:', err));
     }
     isPlaying = false;
@@ -228,23 +236,28 @@ function stopAudio() {
 
 /***** Result and Clear Handlers *****/
 function handleResultEvent({ result }) {
+    const sttDuration = result.stt_result.stt_end_time - result.stt_result.stt_start_time;
+    const llmDuration = result.llm_result.end_time - result.llm_result.start_time;
+    const ttsDuration = result.tts_result.end_time - result.tts_result.start_time;
+
     const timings = [
-        { label: 'Speech-to-Text', value: result.stt_duration, unit: 's' },
-        { label: 'AI Processing', value: result.llm_duration, unit: 's' },
-        { label: 'Text-to-Speech', value: result.tts_duration, unit: 's' },
-        { label: 'First Chunk', value: result.first_chunk_time, unit: 's' },
-        { label: 'Total Duration', value: result.total_duration, unit: 's' }
+        { label: 'Speech-to-Text', value: sttDuration.toFixed(2), unit: 's' },
+        { label: 'AI Processing', value: llmDuration.toFixed(2), unit: 's' },
+        { label: 'Text-to-Speech', value: ttsDuration.toFixed(2), unit: 's' },
+        { label: 'First Chunk', value: result.tts_result.first_chunk_time.toFixed(2), unit: 's' },
+        { label: 'Total Duration', value: (sttDuration + llmDuration + ttsDuration).toFixed(2), unit: 's' }
     ];
+
     const messageDiv = document.createElement('div');
     messageDiv.className = 'message';
     messageDiv.innerHTML = `
           <table class="metrics-table">
             <thead><tr><th>Metric</th><th>Duration</th></tr></thead>
-            <tbody>${timings.map(t => `<tr><td>${t.label}</td><td>${t.value.toLocaleString()} ${t.unit}</td></tr>`).join('')}</tbody>
+            <tbody>${timings.map(t => `<tr><td>${t.label}</td><td>${t.value} ${t.unit}</td></tr>`).join('')}</tbody>
           </table>
           <div class="message-content">
-            <div class="transcript"><strong>You:</strong> ${result.transcript}</div>
-            <div class="response"><strong>Assistant:</strong> ${result.response}</div>
+            <div class="transcript"><strong>You:</strong> ${result.stt_result.transcript}</div>
+            <div class="response"><strong>Assistant:</strong> ${result.llm_result.response}</div>
           </div>`;
     document.getElementById('conversation').appendChild(messageDiv);
     messageDiv.scrollIntoView({ behavior: 'smooth' });
@@ -275,4 +288,19 @@ function toggleTalking() {
         button.textContent = 'Listening...';
         startStream();
     }
+}
+
+// Add new event handlers
+function handleStopSpeakingEvent() {
+    stopAudio();
+}
+
+function handleRestreamEvent() {
+    // Handle restream event if needed
+    console.log('Restreaming audio...');
+}
+
+function handleStartRespondingEvent() {
+    // Handle start responding event if needed
+    console.log('AI starting to respond...');
 }

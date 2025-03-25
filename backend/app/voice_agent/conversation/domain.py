@@ -13,6 +13,7 @@ class StopSpeakingEvent(BaseModel):
 class MediaEvent(BaseModel):
     type: Literal["media"] = "media"
     audio: bytes
+    base64_audio: str
     sid: str
 
     @field_serializer("audio", when_used="json")

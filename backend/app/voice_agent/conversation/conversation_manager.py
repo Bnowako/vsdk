@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 from typing import Awaitable, Callable
 
@@ -87,8 +88,14 @@ async def handle_respond_to_human(
             sid=conversation.id,
             callback=lambda x: result.update(x),
         ):
-            await callback(MediaEvent(audio=chunk, sid=conversation.id))
-            mark_id = conversation.agent_speech_sent(chunk)
+            await callback(
+                MediaEvent(
+                    audio=chunk.audio,
+                    base64_audio=chunk.base64_audio,
+                    sid=conversation.id,
+                )
+            )
+            mark_id = conversation.agent_speech_sent(chunk.audio)
 
             await callback(MarkEvent(mark_id=mark_id, sid=conversation.id))
 
@@ -113,7 +120,13 @@ async def restream_audio(
         conversation.new_agent_speech_start()
         for agent_speech_chunk in unspoken_chunks:
             await callback(
-                MediaEvent(audio=agent_speech_chunk.audio, sid=conversation.id)
+                MediaEvent(
+                    audio=agent_speech_chunk.audio,
+                    base64_audio=base64.b64encode(agent_speech_chunk.audio).decode(
+                        "utf-8"
+                    ),
+                    sid=conversation.id,
+                )
             )
             mark_id = conversation.agent_speech_sent(agent_speech_chunk.audio)
 
