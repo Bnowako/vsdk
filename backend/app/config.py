@@ -27,7 +27,7 @@ class Config:
         client: ElevenLabs = ElevenLabs(api_key=Secrets.ELEVENLABS_API_KEY)
         model: str = "eleven_flash_v2_5"
         voice: str = "Xb7hH8MSUJpSbSDYk0k2"
-        output_format: str = "ulaw_8000"
+        output_format: str = "pcm_16000"  # for twilio use ulaw8000
         language: str = "pl"
 
         def with_model(self, model: str):
