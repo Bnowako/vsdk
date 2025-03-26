@@ -87,7 +87,7 @@ def mock_voice_agent() -> Generator[MagicMock, None, None]:
 
 
 @pytest.mark.asyncio
-async def test_agent_should_detect_speech_and_respond_to_human(
+async def test_should_detect_speech_and_respond_to_human(
     mock_voice_agent: MagicMock,
 ):
     """
@@ -134,5 +134,38 @@ async def test_agent_should_detect_speech_and_respond_to_human(
             f"Transcribed audio length difference: {abs(len(transcribed_audio) - len(pcm_data_expected)) / (SAMPLE_RATE_KHZ * BYTES_PER_SAMPLE)} samples"
         )
 
+    finally:
+        orchestrator.end_conversation()
+
+
+@pytest.mark.asyncio
+async def test_should_not_detect_speech_and_not_respond_to_human(
+    mock_voice_agent: MagicMock,
+):
+    """
+    Test that when there is silence, the agent does not detect the speech,
+    and does not respond.
+
+    The test audio file (7 seconds long) has:
+      - 00:00 - 07:00: Silence
+
+    Expectations:
+      - The voice agent's respond_to_human method is not called.
+      - The callback is not invoked.
+    """
+
+    pcm_data = read_wav_to_pcm("silence.wav")
+
+    orchestrator = ConversationOrchestrator(
+        conversation_id="test_conversation",
+        callback=lambda x: asyncio.sleep(0),
+        voice_agent=mock_voice_agent,
+    )
+
+    try:
+        send_audio(pcm_data, orchestrator)
+        await asyncio.sleep(0.1)
+
+        mock_voice_agent.respond_to_human.assert_not_called()
     finally:
         orchestrator.end_conversation()
