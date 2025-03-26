@@ -91,7 +91,7 @@ async def test_should_not_detect_speech_and_not_respond_to_human(
     pcm_data = read_wav_to_pcm("silence.wav")
 
     orchestrator = ConversationOrchestrator(
-        conversation_id="test_conversation",
+        conversation_id="silence_id",
         callback=lambda x: asyncio.sleep(0),
         voice_agent=mock_voice_agent,
     )
@@ -114,7 +114,7 @@ async def test_should_detect_speech_and_respond_to_human(mock_voice_agent: Magic
     pcm_data_expected = read_wav_to_pcm("single_speech_expected.wav")
 
     orchestrator = ConversationOrchestrator(
-        conversation_id="test_conversation",
+        conversation_id="speech_simple",
         callback=lambda x: asyncio.sleep(0),
         voice_agent=mock_voice_agent,
     )
@@ -154,7 +154,7 @@ async def test_should_detect_speech_and_respond_to_human_once_for_long_pause(
     pcm_data_expected = read_wav_to_pcm("long_pause_expected.wav")
 
     orchestrator = ConversationOrchestrator(
-        conversation_id="test_conversation",
+        conversation_id="long_pause_id",
         callback=lambda x: asyncio.sleep(0),
         voice_agent=mock_voice_agent,
     )
