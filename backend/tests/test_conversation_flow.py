@@ -1,8 +1,8 @@
 import asyncio
 import logging
-import os
 import time
-from typing import Any
+from pathlib import Path
+from typing import Any, AsyncIterator, Generator, Tuple
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,82 +10,56 @@ from app.voice_agent.stt.domain import STTResult
 from app.voice_agent.tts.ElevenTTSProcessor import AudioChunk
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+
+# Constants for readability
+WAV_HEADER_SIZE = 44
+CHUNK_DURATION_MS = 20
+SAMPLE_RATE_KHZ = 8  # in kHz
+BYTES_PER_SAMPLE = 2
+CHUNK_SIZE = CHUNK_DURATION_MS * SAMPLE_RATE_KHZ
 
 
-# write function that reads wav file and returns pcm data from resources folder
-def read_wav_to_pcm(file_path: str) -> bytes:
-    with open(file_path, "rb") as wav_file:
-        wav_file.seek(44)
-        return wav_file.read()
+def read_wav_to_pcm(file_path: Path) -> bytes:
+    """
+    Reads a WAV file and returns its PCM data (skipping the header).
+
+    Args:
+        file_path: The path to the WAV file.
+
+    Returns:
+        The raw PCM data as bytes.
+    """
+    try:
+        with file_path.open("rb") as wav_file:
+            wav_file.seek(WAV_HEADER_SIZE)
+            return wav_file.read()
+    except Exception as e:
+        logger.error(f"Error reading WAV file {file_path}: {e}")
+        raise
 
 
-def send_audio(
-    audio: bytes, orchestrator: Any
-):  # cant import orchestrator due to patches
-    chunk_size = 20 * 8
-    for i in range(0, len(audio), chunk_size):
-        chunk = audio[i : i + chunk_size]
+def send_audio(audio: bytes, orchestrator: Any) -> None:
+    """
+    Sends audio data in chunks to the given orchestrator.
+
+    Args:
+        audio: The complete audio data in bytes.
+        orchestrator: The target orchestrator to receive audio chunks.
+    """
+    for i in range(0, len(audio), CHUNK_SIZE):
+        chunk = audio[i : i + CHUNK_SIZE]
         orchestrator.audio_received(chunk)
 
 
-@pytest.mark.asyncio  # Required for async test functions
-async def test_agent_should_detect_speech_and_respond_to_human():
+@pytest.fixture
+def external_patches() -> Generator[Tuple[MagicMock, MagicMock, MagicMock], None, None]:
     """
-    If human has said something while agent was not talking we should detect it and respond.
-
-    The file contains an 8-second clip. Structure is the following
-    00.00 - 01.18 silence
-    01.18 - 03.90 speech 'chciałbym umówić się do lekarza rodzinnego'
-    03.90 - 08.05 silence
-
-    We expect the following:
-    - speech_to_text was called with about 2.7s of speech
-    - llm and tts were called
-    - voice response was returned
+    Sets up external patches for STT, TTT, and TTS components and yields them.
+    The patches are automatically stopped after the test.
     """
-    # given
-    audio_path = os.path.join(os.getcwd(), "tests", "resources", "single_speech.wav")
-    pcm_data = read_wav_to_pcm(audio_path)
-    patches, mock_stt, mock_ttt, mock_tts = patch_external()
-
-    from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
-
-    orchestrator = ConversationOrchestrator(
-        conversation_id="test_conversation",
-        callback=lambda x: asyncio.sleep(0),
-    )
-    try:
-        # when
-        send_audio(pcm_data, orchestrator)
-        await asyncio.sleep(0.1)
-
-        # then
-        # Verify STT was called with speech segment
-        mock_stt.assert_called_once()
-        transcribed_audio = mock_stt.call_args[0][0]
-
-        # Check if the transcribed audio length is approximately 2.3s
-        audio_duration = len(transcribed_audio) / 2 / 8 / 1000
-        assert 2.3 <= audio_duration <= 2.5, (
-            f"Expected ~2.3s of audio, got {audio_duration}s"
-        )
-
-        # Verify TTT and TTS were called
-        mock_ttt.assert_called_once()
-        mock_tts.assert_called_once()
-
-    finally:
-        # Clean up patches
-        orchestrator.end_conversation()
-        for p in patches:
-            p.stop()
-
-
-def patch_external():
     mock_stt = MagicMock()
 
-    async def mock_stt_async(*args, **kwargs):
+    async def mock_stt_async(*args, **kwargs):  # type: ignore
         return STTResult(
             stt_start_time=time.time(),
             stt_end_time=time.time(),
@@ -97,24 +71,23 @@ def patch_external():
 
     mock_ttt = MagicMock()
 
-    async def mock_astream(*args, **kwargs):
+    async def mock_astream(*args, **kwargs):  # type: ignore
         yield "Ok, pomogę ci umówić wizytę."
 
     mock_ttt.return_value = mock_astream()
 
     mock_tts = MagicMock()
 
-    async def mock_tts_stream(input_generator):
+    async def mock_tts_stream(input_generator: AsyncIterator[str]):
         async for text in input_generator:
             yield AudioChunk(
-                audio=b"synthetic_audio_data",
+                audio=b"synthetic_audio_data " + text.encode("utf-8"),
                 base64_audio="base64_encoded_audio",
                 normalized_alignment=None,
             )
 
     mock_tts.side_effect = mock_tts_stream
 
-    # Setup patches
     patches = [
         patch(
             "app.voice_agent.stt.GroqSTTProcessor.GroqSTTProcessor",
@@ -128,4 +101,72 @@ def patch_external():
     ]
     for p in patches:
         p.start()
-    return patches, mock_stt, mock_ttt, mock_tts
+
+    yield mock_stt, mock_ttt, mock_tts
+
+    for p in patches:
+        p.stop()
+
+
+@pytest.mark.asyncio
+async def test_agent_should_detect_speech_and_respond_to_human(
+    external_patches: Tuple[MagicMock, MagicMock, MagicMock],
+):
+    """
+    Test that when a human speaks while the agent is not talking, the agent detects the speech,
+    transcribes it, and responds appropriately.
+
+    The test audio file (8 seconds long) has:
+      - 00:00 - 01:18: Silence
+      - 01:18 - 03:90: Speech ("chciałbym umówić się do lekarza rodzinnego")
+      - 03:90 - 08:05: Silence
+
+    Expectations:
+      - The STT process is invoked with approximately the correct audio segment.
+      - The language model (TTT) and TTS are called to generate a response.
+    """
+
+    tests_dir = Path.cwd() / "tests" / "resources"
+    audio_path = tests_dir / "single_speech.wav"
+    expected_audio_path = tests_dir / "single_speech_expected.wav"
+
+    pcm_data = read_wav_to_pcm(audio_path)
+    pcm_data_expected = read_wav_to_pcm(expected_audio_path)
+    mock_stt, mock_ttt, mock_tts = external_patches
+
+    from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
+
+    orchestrator = ConversationOrchestrator(
+        conversation_id="test_conversation",
+        callback=lambda x: asyncio.sleep(0),
+    )
+
+    try:
+        # Act: send the audio and allow asynchronous processes to run briefly
+        send_audio(pcm_data, orchestrator)
+        await asyncio.sleep(
+            0.1
+        )  # Consider using a more robust synchronization approach if possible
+
+        # Assert: verify that STT was called correctly
+        mock_stt.assert_called_once()
+        transcribed_audio = mock_stt.call_args[0][0]
+
+        assert pcm_data_expected in transcribed_audio, (
+            "Expected speech segment not found in transcribed audio."
+        )
+
+        allowable_diff = 200 * SAMPLE_RATE_KHZ * BYTES_PER_SAMPLE
+        assert abs(len(transcribed_audio) - len(pcm_data_expected)) <= allowable_diff, (
+            "Transcribed audio length difference exceeds allowed threshold."
+        )
+        logger.info(
+            f"Transcribed audio length difference: {abs(len(transcribed_audio) - len(pcm_data_expected)) / (SAMPLE_RATE_KHZ * BYTES_PER_SAMPLE)} samples"
+        )
+
+        # Assert: verify that both TTT and TTS were invoked exactly once
+        mock_ttt.assert_called_once()
+        mock_tts.assert_called_once()
+
+    finally:
+        orchestrator.end_conversation()
