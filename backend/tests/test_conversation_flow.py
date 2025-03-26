@@ -17,9 +17,10 @@ CHUNK_DURATION_MS = 20
 SAMPLE_RATE_KHZ = 8  # in kHz
 BYTES_PER_SAMPLE = 2
 CHUNK_SIZE = CHUNK_DURATION_MS * SAMPLE_RATE_KHZ
+TESTS_DIR = Path.cwd() / "tests" / "resources"
 
 
-def read_wav_to_pcm(file_path: Path) -> bytes:
+def read_wav_to_pcm(file_name: str) -> bytes:
     """
     Reads a WAV file and returns its PCM data (skipping the header).
 
@@ -29,6 +30,7 @@ def read_wav_to_pcm(file_path: Path) -> bytes:
     Returns:
         The raw PCM data as bytes.
     """
+    file_path = TESTS_DIR / file_name
     try:
         with file_path.open("rb") as wav_file:
             wav_file.seek(WAV_HEADER_SIZE)
@@ -126,12 +128,8 @@ async def test_agent_should_detect_speech_and_respond_to_human(
       - The language model (TTT) and TTS are called to generate a response.
     """
 
-    tests_dir = Path.cwd() / "tests" / "resources"
-    audio_path = tests_dir / "single_speech.wav"
-    expected_audio_path = tests_dir / "single_speech_expected.wav"
-
-    pcm_data = read_wav_to_pcm(audio_path)
-    pcm_data_expected = read_wav_to_pcm(expected_audio_path)
+    pcm_data = read_wav_to_pcm("single_speech.wav")
+    pcm_data_expected = read_wav_to_pcm("single_speech_expected.wav")
     mock_stt, mock_ttt, mock_tts = external_patches
 
     from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
@@ -144,9 +142,7 @@ async def test_agent_should_detect_speech_and_respond_to_human(
     try:
         # Act: send the audio and allow asynchronous processes to run briefly
         send_audio(pcm_data, orchestrator)
-        await asyncio.sleep(
-            0.1
-        )  # Consider using a more robust synchronization approach if possible
+        await asyncio.sleep(0.1)
 
         # Assert: verify that STT was called correctly
         mock_stt.assert_called_once()
