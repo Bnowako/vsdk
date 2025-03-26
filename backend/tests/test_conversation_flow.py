@@ -2,10 +2,12 @@ import asyncio
 import logging
 import time
 from pathlib import Path
-from typing import Any, AsyncIterator, Generator, Tuple
+from typing import Any, AsyncIterator, Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
+from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
+from app.voice_agent.domain import RespondToHumanResult
 from app.voice_agent.stt.domain import STTResult
 from app.voice_agent.tts.ElevenTTSProcessor import AudioChunk
 
@@ -54,65 +56,39 @@ def send_audio(audio: bytes, orchestrator: Any) -> None:
 
 
 @pytest.fixture
-def external_patches() -> Generator[Tuple[MagicMock, MagicMock, MagicMock], None, None]:
+def mock_voice_agent() -> Generator[MagicMock, None, None]:
     """
-    Sets up external patches for STT, TTT, and TTS components and yields them.
-    The patches are automatically stopped after the test.
+    Sets up a mock for the VoiceAgent's respond_to_human method and yields it.
+    The mock is automatically stopped after the test.
     """
-    mock_stt = MagicMock()
+    mock_agent = MagicMock()
 
-    async def mock_stt_async(*args, **kwargs):  # type: ignore
-        return STTResult(
+    async def mock_respond_to_human(
+        *args: Any, **kwargs: Any
+    ) -> AsyncIterator[AudioChunk]:
+        result = RespondToHumanResult.empty()
+        result.stt_result = STTResult(
             stt_start_time=time.time(),
             stt_end_time=time.time(),
             transcript="test transcript",
             speech_file=b"mock_speech_file",
         )
+        yield AudioChunk(
+            audio=b"synthetic_audio_data",
+            base64_audio="base64_encoded_audio",
+            normalized_alignment=None,
+        )
+        kwargs["callback"](result)
 
-    mock_stt.side_effect = mock_stt_async
+    mock_agent.respond_to_human.side_effect = mock_respond_to_human
 
-    mock_ttt = MagicMock()
-
-    async def mock_astream(*args, **kwargs):  # type: ignore
-        yield "Ok, pomogę ci umówić wizytę."
-
-    mock_ttt.return_value = mock_astream()
-
-    mock_tts = MagicMock()
-
-    async def mock_tts_stream(input_generator: AsyncIterator[str]):
-        async for text in input_generator:
-            yield AudioChunk(
-                audio=b"synthetic_audio_data " + text.encode("utf-8"),
-                base64_audio="base64_encoded_audio",
-                normalized_alignment=None,
-            )
-
-    mock_tts.side_effect = mock_tts_stream
-
-    patches = [
-        patch(
-            "app.voice_agent.stt.GroqSTTProcessor.GroqSTTProcessor",
-            return_value=mock_stt,
-        ),
-        patch("app.voice_agent.ttt.OpenAIAgent.OpenAIAgent", return_value=mock_ttt),
-        patch(
-            "app.voice_agent.tts.ElevenTTSProcessor.ElevenTTSProcessor",
-            return_value=mock_tts,
-        ),
-    ]
-    for p in patches:
-        p.start()
-
-    yield mock_stt, mock_ttt, mock_tts
-
-    for p in patches:
-        p.stop()
+    with patch("app.voice_agent.voice_agent.VoiceAgent", return_value=mock_agent):
+        yield mock_agent
 
 
 @pytest.mark.asyncio
 async def test_agent_should_detect_speech_and_respond_to_human(
-    external_patches: Tuple[MagicMock, MagicMock, MagicMock],
+    mock_voice_agent: MagicMock,
 ):
     """
     Test that when a human speaks while the agent is not talking, the agent detects the speech,
@@ -124,29 +100,27 @@ async def test_agent_should_detect_speech_and_respond_to_human(
       - 03:90 - 08:05: Silence
 
     Expectations:
-      - The STT process is invoked with approximately the correct audio segment.
-      - The language model (TTT) and TTS are called to generate a response.
+      - The voice agent's respond_to_human method is called with the correct audio segment.
+      - The callback is invoked with the appropriate result.
     """
 
     pcm_data = read_wav_to_pcm("single_speech.wav")
     pcm_data_expected = read_wav_to_pcm("single_speech_expected.wav")
-    mock_stt, mock_ttt, mock_tts = external_patches
-
-    from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
 
     orchestrator = ConversationOrchestrator(
         conversation_id="test_conversation",
         callback=lambda x: asyncio.sleep(0),
+        voice_agent=mock_voice_agent,
     )
 
     try:
-        # Act: send the audio and allow asynchronous processes to run briefly
         send_audio(pcm_data, orchestrator)
         await asyncio.sleep(0.1)
 
-        # Assert: verify that STT was called correctly
-        mock_stt.assert_called_once()
-        transcribed_audio = mock_stt.call_args[0][0]
+        mock_voice_agent.respond_to_human.assert_called_once()
+        transcribed_audio = mock_voice_agent.respond_to_human.call_args.kwargs[
+            "pcm_audio_buffer"
+        ]
 
         assert pcm_data_expected in transcribed_audio, (
             "Expected speech segment not found in transcribed audio."
@@ -159,10 +133,6 @@ async def test_agent_should_detect_speech_and_respond_to_human(
         logger.info(
             f"Transcribed audio length difference: {abs(len(transcribed_audio) - len(pcm_data_expected)) / (SAMPLE_RATE_KHZ * BYTES_PER_SAMPLE)} samples"
         )
-
-        # Assert: verify that both TTT and TTS were invoked exactly once
-        mock_ttt.assert_called_once()
-        mock_tts.assert_called_once()
 
     finally:
         orchestrator.end_conversation()
