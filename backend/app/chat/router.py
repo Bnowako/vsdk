@@ -2,7 +2,8 @@ import json
 import logging
 import uuid
 
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, Request, WebSocket
+from fastapi.templating import Jinja2Templates
 
 from app.chat.stagehand_client import stagehand_client
 
@@ -13,6 +14,13 @@ router = APIRouter()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+templates = Jinja2Templates(directory="templates")
+
+
+@router.get("/chat")
+async def chat_page(request: Request):
+    return templates.TemplateResponse("chat.html", {"request": request})
 
 
 # create web socket connection for chat
