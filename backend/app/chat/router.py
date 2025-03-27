@@ -5,9 +5,9 @@ import uuid
 from fastapi import APIRouter, Request, WebSocket
 from fastapi.templating import Jinja2Templates
 
+from app.chat.BroAIAgent import BroAgent
 from app.chat.stagehand_client import stagehand_client
 
-from .agent import LLMAgent
 from .schemas import PostUserMessage
 
 router = APIRouter()
@@ -30,7 +30,7 @@ async def chat(websocket: WebSocket):
     conversation_id = str(uuid.uuid4())
     logger.info("WebSocket connection accepted")
 
-    agent = LLMAgent()
+    agent = BroAgent()
     logger.info("Agent initialized")
     while True:
         data = await websocket.receive_text()
@@ -38,7 +38,7 @@ async def chat(websocket: WebSocket):
 
         message = PostUserMessage(**json.loads(data))
 
-        async for response in agent.astream(message.content, conversation_id):
+        async for response in agent.chat_astream(message.content, conversation_id):
             logger.info(f"WS sent: {response.model_dump_json()}")
             await websocket.send_text(response.model_dump_json())
 

@@ -194,3 +194,14 @@ Then use observe_elements or perform_action as appropriate, following further us
                     response=full_response,
                 )
             )
+
+    async def chat_astream(
+        self, user_query: str, conversation_id: str
+    ) -> AsyncIterator[BaseMessage]:
+        async for event in self.graph.astream(  # type: ignore
+            input={"messages": [HumanMessage(content=user_query)]},
+            config={"configurable": {"thread_id": conversation_id}},
+            stream_mode="values",
+        ):
+            logger.info(f"Yielding Event: {event}")
+            yield event["messages"][-1]

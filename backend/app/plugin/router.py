@@ -16,7 +16,7 @@ from app.voice_agent.conversation.domain import (
 from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
 from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
 from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
-from app.voice_agent.ttt.BroAIAgent import BroAgent
+from app.chat.BroAIAgent import BroAgent
 from app.voice_agent.voice_agent import VoiceAgent
 
 logger = logging.getLogger(__name__)
