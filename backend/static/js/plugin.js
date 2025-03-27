@@ -237,15 +237,18 @@ function stopAudio() {
 /***** Result and Clear Handlers *****/
 function handleResultEvent({ result }) {
     const sttDuration = result.stt_result.stt_end_time - result.stt_result.stt_start_time;
-    const llmDuration = result.llm_result.end_time - result.llm_result.start_time;
-    const ttsDuration = result.tts_result.end_time - result.tts_result.start_time;
+    const llmTtfToken = result.llm_result.end_time - result.llm_result.first_chunk_time;
+    const ttsTtfChunk = result.tts_result.end_time - result.tts_result.first_chunk_time;
+
+    const eosToFirstChunk = result.tts_result.first_chunk_time - result.stt_result.stt_start_time;
+    const totalDuration = result.tts_result.end_time - result.stt_result.stt_start_time;
 
     const timings = [
         { label: 'Speech-to-Text', value: sttDuration.toFixed(2), unit: 's' },
-        { label: 'AI Processing', value: llmDuration.toFixed(2), unit: 's' },
-        { label: 'Text-to-Speech', value: ttsDuration.toFixed(2), unit: 's' },
-        { label: 'First Chunk', value: result.tts_result.first_chunk_time.toFixed(2), unit: 's' },
-        { label: 'Total Duration', value: (sttDuration + llmDuration + ttsDuration).toFixed(2), unit: 's' }
+        { label: 'LLM TTF Token', value: llmTtfToken.toFixed(2), unit: 's' },
+        { label: 'Text-to-Speech TTF Chunk', value: ttsTtfChunk.toFixed(2), unit: 's' },
+        { label: 'EOS to First Chunk', value: eosToFirstChunk.toFixed(2), unit: 's' },
+        { label: 'Total Duration', value: totalDuration.toFixed(2), unit: 's' }
     ];
 
     const messageDiv = document.createElement('div');

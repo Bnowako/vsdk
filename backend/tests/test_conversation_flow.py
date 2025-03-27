@@ -1,3 +1,14 @@
+"""
+This tests are unstable and hacked, but are helpful for development.
+Basically they mimic the tests that I've done manually in the past by talking to the agent.
+
+TODO:
+ - Implement proper conversation client mock, that sends marks of spoken audio etc.
+ - Test all events in the conversation flow.
+ - Support for running tests in parallel.
+ - Create testing framework for conversation flow?
+"""
+
 import asyncio
 import logging
 import time
@@ -7,6 +18,7 @@ from typing import Any, AsyncIterator, Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
+from app.voice_agent.conversation.domain import ConversationEvent
 from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
 from app.voice_agent.domain import RespondToHumanResult
 from app.voice_agent.stt.domain import STTResult
@@ -86,7 +98,10 @@ async def test_should_not_detect_speech_and_not_respond_to_human(
     mock_voice_agent: MagicMock,
 ):
     """
-    When there is silence, the agent should not detect speech nor respond.
+    - Human: Silence
+    - Agent: Not speaking
+
+    - Expect: Agent should not detect speech, and not respond.
     """
     pcm_data = read_wav_to_pcm("silence.wav")
 
@@ -106,9 +121,14 @@ async def test_should_not_detect_speech_and_not_respond_to_human(
 
 
 @pytest.mark.asyncio
-async def test_should_detect_speech_and_respond_to_human(mock_voice_agent: MagicMock):
+async def test_should_detect_long_speech_and_respond_to_human(
+    mock_voice_agent: MagicMock,
+):
     """
-    When a human speaks, the agent should detect speech, transcribe it, and respond.
+    - Human: Long speech
+    - Agent: Not speaking
+
+    - Expect: Agent should detect speech, and respond.
     """
     pcm_data = read_wav_to_pcm("single_speech.wav")
     pcm_data_expected = read_wav_to_pcm("single_speech_expected.wav")
@@ -144,11 +164,58 @@ async def test_should_detect_speech_and_respond_to_human(mock_voice_agent: Magic
 
 
 @pytest.mark.asyncio
+async def test_should_detect_short_speech_and_respond_to_human(
+    mock_voice_agent: MagicMock,
+):
+    """
+    - Human: Short speech
+    - Agent: Not speaking
+
+    - Expect: Agent should detect speech, and respond.
+    """
+    pcm_data = read_wav_to_pcm("short_speech.wav")
+    pcm_data_expected = read_wav_to_pcm("short_speech_expected.wav")
+
+    orchestrator = ConversationOrchestrator(
+        conversation_id="short_interrupt_id",
+        callback=lambda x: asyncio.sleep(0),
+        voice_agent=mock_voice_agent,
+    )
+
+    try:
+        await send_audio(pcm_data, orchestrator)
+        await asyncio.sleep(0.1)  # Give time for processing
+
+        mock_voice_agent.respond_to_human.assert_called_once()
+        transcribed_audio = mock_voice_agent.respond_to_human.call_args.kwargs[
+            "pcm_audio_buffer"
+        ]
+        debug_write_wav(transcribed_audio, "transcribed_audio.wav")
+
+        assert pcm_data_expected in transcribed_audio, (
+            "Expected speech segment not found in transcribed audio."
+        )
+
+        allowable_diff = 200 * SAMPLE_RATE_KHZ * BYTES_PER_SAMPLE
+        assert abs(len(transcribed_audio) - len(pcm_data_expected)) <= allowable_diff, (
+            "Transcribed audio length difference exceeds allowed threshold."
+        )
+        logger.info(
+            f"Transcribed audio length difference: {abs(len(transcribed_audio) - len(pcm_data_expected)) / (SAMPLE_RATE_KHZ * BYTES_PER_SAMPLE)} samples"
+        )
+    finally:
+        orchestrator.end_conversation()
+
+
+@pytest.mark.asyncio
 async def test_should_detect_speech_and_respond_to_human_once_for_long_pause(
     mock_voice_agent: MagicMock,
 ):
     """
-    When speech occurs with a long pause between segments, the agent should respond twice.
+    - Human: Speech with a long pause between segments
+    - Agent: Not speaking
+
+    - Expect: Agent should respond to the whole speech (segments from before long pause and after long pause).
     """
     pcm_data = read_wav_to_pcm("long_pause.wav")
     pcm_data_expected = read_wav_to_pcm("long_pause_expected.wav")
@@ -204,6 +271,92 @@ async def test_should_detect_speech_and_respond_to_human_once_for_long_pause(
         logger.info(
             f"Transcribed audio length difference: {abs(len(transcribed_audio) - len(pcm_data_expected)) / (SAMPLE_RATE_KHZ * BYTES_PER_SAMPLE)} samples"
         )
+    finally:
+        orchestrator.end_conversation()
+
+
+@pytest.mark.asyncio
+async def test_should_detect_short_speech_stop_agent_and_restream(
+    mock_voice_agent: MagicMock,
+):
+    """
+    - Human: Long speech
+    - Agent: Starts speaking
+    - Human: Short speech interupting the agent
+
+    - Expect: Agent should stop speaking, wait for the human to finish speaking, and then restream the interrupted Agent speech.
+
+    *Cases like  "mhm".
+
+    TODO: Maybe in the future we should save it because what if the short speech has meaning like "yes" or "no"
+    """
+    pcm_data = read_wav_to_pcm("single_speech.wav")
+    short_pcm_data = read_wav_to_pcm("short_speech.wav")
+    pcm_data_expected = read_wav_to_pcm("single_speech_expected.wav")
+
+    conversation_events: list[ConversationEvent] = []
+
+    async def callback(event: ConversationEvent):
+        logger.info(f"🧪 Callback called with event: {event}")
+        conversation_events.append(event)
+
+    orchestrator = ConversationOrchestrator(
+        conversation_id="short_interrupt_restream_id",
+        callback=callback,
+        voice_agent=mock_voice_agent,
+    )
+
+    async def mock_respond_to_human(
+        *args: Any, **kwargs: Any
+    ) -> AsyncIterator[AudioChunk]:
+        logger.info("🧪 Mock respond to human called")
+        result = RespondToHumanResult.empty()
+        result.stt_result = STTResult(
+            stt_start_time=time.time(),
+            stt_end_time=time.time(),
+            transcript="test transcript",
+            speech_file=b"mock_speech_file",
+        )
+        logger.info("🧪 Sleeping longer than the pause interval")
+        logger.info("🧪 Resuming after sleep")
+
+        for _ in range(0, 10):
+            await asyncio.sleep(1)  # Ensure this delay is longer than the pause
+            yield AudioChunk(
+                audio=b"synthetic_audio_data",
+                base64_audio="base64_encoded_audio",
+                normalized_alignment=None,
+            )
+        kwargs["callback"](result)
+
+    # Override the side effect for this test only.
+    mock_voice_agent.respond_to_human.side_effect = mock_respond_to_human
+    try:
+        await send_audio(pcm_data, orchestrator)
+        await asyncio.sleep(0.1)  # Give time for processing
+        await send_audio(short_pcm_data, orchestrator)
+        await asyncio.sleep(5)  # Give time for processing
+
+        mock_voice_agent.respond_to_human.assert_called_once()
+        transcribed_audio = mock_voice_agent.respond_to_human.call_args.kwargs[
+            "pcm_audio_buffer"
+        ]
+        assert pcm_data_expected in transcribed_audio, (
+            "Expected speech segment not found in transcribed audio."
+        )
+
+        allowable_diff = 200 * SAMPLE_RATE_KHZ * BYTES_PER_SAMPLE
+        assert abs(len(transcribed_audio) - len(pcm_data_expected)) <= allowable_diff, (
+            "Transcribed audio length difference exceeds allowed threshold."
+        )
+        logger.info(
+            f"Transcribed audio length difference: {abs(len(transcribed_audio) - len(pcm_data_expected)) / (SAMPLE_RATE_KHZ * BYTES_PER_SAMPLE)} samples"
+        )
+
+        start_restream = [
+            event for event in conversation_events if event.type == "start_restream"
+        ]
+        assert len(start_restream) == 1
     finally:
         orchestrator.end_conversation()
 
