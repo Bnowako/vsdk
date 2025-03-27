@@ -228,23 +228,31 @@ function stopAudio() {
 
 /***** Result and Clear Handlers *****/
 function handleResultEvent({ result }) {
+    const sttDuration = result.stt_result.stt_end_time - result.stt_result.stt_start_time;
+    const llmTtfToken = result.llm_result.end_time - result.llm_result.first_chunk_time;
+    const ttsTtfChunk = result.tts_result.end_time - result.tts_result.first_chunk_time;
+
+    const eosToFirstChunk = result.tts_result.first_chunk_time - result.stt_result.stt_start_time;
+    const totalDuration = result.tts_result.end_time - result.stt_result.stt_start_time;
+
     const timings = [
-        { label: 'Speech-to-Text', value: result.stt_duration, unit: 's' },
-        { label: 'AI Processing', value: result.llm_duration, unit: 's' },
-        { label: 'Text-to-Speech', value: result.tts_duration, unit: 's' },
-        { label: 'First Chunk', value: result.first_chunk_time, unit: 's' },
-        { label: 'Total Duration', value: result.total_duration, unit: 's' }
+        { label: 'Speech-to-Text', value: sttDuration.toFixed(2), unit: 's' },
+        { label: 'LLM TTF Token', value: llmTtfToken.toFixed(2), unit: 's' },
+        { label: 'Text-to-Speech TTF Chunk', value: ttsTtfChunk.toFixed(2), unit: 's' },
+        { label: 'EOS to First Chunk', value: eosToFirstChunk.toFixed(2), unit: 's' },
+        { label: 'Total Duration', value: totalDuration.toFixed(2), unit: 's' }
     ];
+
     const messageDiv = document.createElement('div');
     messageDiv.className = 'message';
     messageDiv.innerHTML = `
           <table class="metrics-table">
             <thead><tr><th>Metric</th><th>Duration</th></tr></thead>
-            <tbody>${timings.map(t => `<tr><td>${t.label}</td><td>${t.value.toLocaleString()} ${t.unit}</td></tr>`).join('')}</tbody>
+            <tbody>${timings.map(t => `<tr><td>${t.label}</td><td>${t.value} ${t.unit}</td></tr>`).join('')}</tbody>
           </table>
           <div class="message-content">
-            <div class="transcript"><strong>You:</strong> ${result.transcript}</div>
-            <div class="response"><strong>Assistant:</strong> ${result.response}</div>
+            <div class="transcript"><strong>You:</strong> ${result.stt_result.transcript}</div>
+            <div class="response"><strong>Assistant:</strong> ${result.llm_result.response}</div>
           </div>`;
     document.getElementById('conversation').appendChild(messageDiv);
     messageDiv.scrollIntoView({ behavior: 'smooth' });

@@ -9,7 +9,6 @@ from app.audio.audio_utils import mulaw_to_pcm
 from app.twilio.schemas import (
     ClearEventWS,
     CustomResultEvent,
-    CycleResult,
     MarkData,
     MediaData,
     TwilioMarkEvent,
@@ -138,22 +137,7 @@ async def send_result(
     websocket: WebSocket,
     result: RespondToHumanResult,
 ):
-    await websocket.send_text(
-        CustomResultEvent(
-            result=CycleResult(
-                stt_duration=result.stt_result.stt_end_time
-                - result.stt_result.stt_start_time,
-                llm_duration=result.llm_result.end_time - result.llm_result.start_time,
-                tts_duration=result.tts_result.end_time - result.tts_result.start_time,
-                total_duration=result.llm_result.end_time
-                - result.stt_result.stt_start_time,
-                first_chunk_time=result.llm_result.start_time
-                - result.stt_result.stt_start_time,
-                transcript=result.stt_result.transcript,
-                response=result.llm_result.response,
-            )
-        ).model_dump_json()
-    )
+    await websocket.send_text(CustomResultEvent(result=result).model_dump_json())
 
 
 async def send_stop_speaking(websocket: WebSocket):

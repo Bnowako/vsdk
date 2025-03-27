@@ -70,7 +70,7 @@ class OpenAIAgent(BaseAgent):
             if isinstance(msg, AIMessageChunk):
                 # Record the time to first chunk
                 if first_chunk_time is None:
-                    first_chunk_time = time.time() - start_time
+                    first_chunk_time = time.time()
 
                 # Accumulate the full response
                 content: str = msg.content  # type: ignore

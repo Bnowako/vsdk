@@ -2,6 +2,8 @@ from typing import Literal, Union
 
 from pydantic import BaseModel
 
+from app.voice_agent.domain import RespondToHumanResult
+
 
 class StartData(BaseModel):
     streamSid: str
@@ -40,19 +42,9 @@ class TwilioClosedEvent(BaseModel):
     event: Literal["closed"] = "closed"
 
 
-class CycleResult(BaseModel):
-    stt_duration: float
-    llm_duration: float
-    tts_duration: float
-    total_duration: float
-    first_chunk_time: float
-    transcript: str
-    response: str
-
-
 class CustomResultEvent(BaseModel):
     event: Literal["result"] = "result"
-    result: CycleResult
+    result: RespondToHumanResult
 
 
 TwilioEventType = Union[
