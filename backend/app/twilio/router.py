@@ -1,3 +1,4 @@
+import audioop
 import base64
 import json
 import logging
@@ -5,7 +6,6 @@ import logging
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from starlette.templating import Jinja2Templates
 
-from app.audio.audio_utils import mulaw_to_pcm
 from app.twilio.schemas import (
     ClearEventWS,
     CustomResultEvent,
@@ -70,7 +70,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif event_type == "media" and conversation_container:
                     media_event = TwilioMediaEvent(**data)
                     decoded_audio = base64.b64decode(media_event.media.payload)
-                    pcm_audio = mulaw_to_pcm(decoded_audio)
+                    pcm_audio = _mulaw_to_pcm(decoded_audio)
 
                     conversation_container.audio_received(pcm_audio)
                 elif event_type == "closed":
@@ -143,3 +143,8 @@ async def send_result(
 async def send_stop_speaking(websocket: WebSocket):
     event = ClearEventWS()
     await websocket.send_text(event.model_dump_json())
+
+
+def _mulaw_to_pcm(mulaw_data: bytes):
+    pcm_data = audioop.ulaw2lin(mulaw_data, 2)
+    return pcm_data
