@@ -22,13 +22,13 @@ from vsdk.voice_agent import VoiceAgent
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-router = APIRouter(prefix="/plugin", tags=["plugin"])
+router = APIRouter(prefix="/vsdk", tags=["vsdk"])
 templates = Jinja2Templates(directory="templates")
 
 
 @router.get("/")
 async def index(request: Request):
-    return templates.TemplateResponse("plugin.html", {"request": request})
+    return templates.TemplateResponse("vsdk.html", {"request": request})
 
 
 @router.websocket("/ws")

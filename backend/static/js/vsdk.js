@@ -1,6 +1,6 @@
 /***** Configuration Constants *****/
 const CONFIG = {
-    SOCKET_URL: 'ws://localhost:8000/plugin/ws',
+    SOCKET_URL: 'ws://localhost:8000/vsdk/ws',
     AUDIO_SAMPLE_RATE: 8000,
     AI_VOICE_SAMPLE_RATE: 16000,
     SCRIPT_PROCESSOR_BUFFER_SIZE: 256,
