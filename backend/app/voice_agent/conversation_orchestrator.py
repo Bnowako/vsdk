@@ -5,6 +5,7 @@ from typing import Awaitable, Callable
 
 from langchain_openai import ChatOpenAI
 
+from app.config import Config
 from app.voice_agent.conversation.domain import (
     ConversationEvent,
     MarkEvent,
@@ -14,11 +15,12 @@ from app.voice_agent.conversation.domain import (
     StartRespondingEvent,
     StopSpeakingEvent,
 )
-from app.voice_agent.conversation.models import Conversation, ConversationState
+from app.voice_agent.conversation.base import Conversation, ConversationState
 from app.voice_agent.domain import RespondToHumanResult
 from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
 from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
 from app.voice_agent.ttt.OpenAIAgent import OpenAIAgent
+from app.voice_agent.vad.vad import VAD, VADResult
 from app.voice_agent.voice_agent import VoiceAgent
 
 logger = logging.getLogger(__name__)
@@ -45,6 +47,7 @@ class ConversationOrchestrator:
             self._conversation_turn_manager()
         )
         self.callback = callback
+        self.vad = VAD(id=conversation_id)
 
     def audio_received(self, pcm_audio: bytes):
         self.conversation.audio_received(pcm_audio)
@@ -62,7 +65,8 @@ class ConversationOrchestrator:
                 if (
                     self.conversation.is_new_audio_ready_to_process()
                 ):  # todo add queue and wait here for new audio ready to process
-                    conversation_state = self.conversation.process()
+                    vad_result = self._check_for_speech()
+                    conversation_state = self.conversation.vad_update(vad_result)
                     logger.debug(f"🖥️ Conversation state: {conversation_state}")
 
                     match conversation_state:
@@ -165,3 +169,14 @@ class ConversationOrchestrator:
                 await callback(MarkEvent(mark_id=mark_id, sid=conversation.id))
         except Exception as e:
             logger.error(f"Exception in restream_audio: {e}")
+
+    def _check_for_speech(self) -> VADResult | None:
+        data_to_process = self.conversation.get_data_to_process_and_clear()
+        if (
+            len(data_to_process)
+            > 1 * Config.Audio.sample_rate * Config.Audio.bytes_per_sample
+        ):
+            logger.warning(
+                "Too much audio data to process. Something is off. Get rid off me"
+            )
+        return self.vad.silero_iterator(data_to_process)

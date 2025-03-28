@@ -1,10 +1,14 @@
-from enum import Enum
+"""
+TODO This class needs refactoring!!! Mostly hacked audio processing here.
+"""
+
 import logging
 from asyncio import Task
+from enum import Enum
 from typing import List
 
-from app.voice_agent.vad.vad import VADResult, silero_iterator
 from app.config import Config
+from app.voice_agent.vad.vad import VADResult
 
 logger = logging.getLogger(__name__)
 
@@ -287,53 +291,42 @@ class Conversation:
     def state_string(self):
         return f"Conversation state:  new_pcm_audio: {len(self.new_pcm_audio)} pcm_audio_buffer: {len(self.pcm_audio_buffer)} human_speech_without_response: {len(self.human_speech_without_response)}"  # todo add more to this log
 
-    def process(self):
-        speech_result = self.check_for_speech()
-
-        if speech_result is None:
+    def vad_update(self, vad_result: VADResult | None):
+        if vad_result is None:
             return ConversationState.HUMAN_SILENT
 
-        if speech_result.ended:
+        if vad_result.ended:
             logger.info(
-                f"Human speach ended. Speach length: {speech_result.end_sample or 0 - speech_result.start_sample}. "  # todo add more to his log
+                f"Human speach ended. Speach length: {vad_result.end_sample or 0 - vad_result.start_sample}. "  # todo add more to his log
             )
 
-            self.human_speech_ended(speech_result)
+            self.human_speech_ended(vad_result)
 
-            if self.agent_was_interrupted() and speech_result.is_short():
+            if self.agent_was_interrupted() and vad_result.is_short():
                 logger.info("🎙️🏁Short Human speech, agent was interrupted")
                 return ConversationState.SHORT_INTERRUPTION_DURING_AGENT_SPEAKING
 
-            if self.agent_was_interrupted() and speech_result.is_long():
+            if self.agent_was_interrupted() and vad_result.is_long():
                 logger.info("🎙️🏁Long Human speech, agent was interrupted")
                 return ConversationState.LONG_INTERRUPTION_DURING_AGENT_SPEAKING
 
-            if speech_result.is_short():
+            if vad_result.is_short():
                 logger.info("🎙️🏁Short Human speech detected")
                 return ConversationState.SHORT_SPEECH
 
-            if speech_result.is_long():
+            if vad_result.is_long():
                 logger.info("🎙️🏁Long Human speech detected")
                 return ConversationState.LONG_SPEECH
 
             raise ValueError("🎙️🏁Human speech ended, but no state was matched")
 
-        elif not speech_result.ended:
+        elif not vad_result.ended:
             if self.is_agent_speaking():
                 logger.info("🎙️🟢 Human and Agent are speaking.")
                 return ConversationState.BOTH_SPEAKING
             else:
                 logger.info("🎙️🟢 Human started speaking")
                 return ConversationState.HUMAN_STARTED_SPEAKING
-
-    def check_for_speech(self) -> VADResult | None:
-        data_to_process = self.get_data_to_process_and_clear()
-        if (
-            len(data_to_process)
-            > 1 * Config.Audio.sample_rate * Config.Audio.bytes_per_sample
-        ):
-            logger.warning("Too much audio data to process. Get rid off me")
-        return silero_iterator(data_to_process, self.id)
 
     class Config:
         arbitrary_types_allowed = True
