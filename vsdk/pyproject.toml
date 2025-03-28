@@ -1,0 +1,10 @@
+[project]
+name = "vsdk"
+version = "0.1.0"
+description = "Voice SDK for voice agents"
+authors = [{name = "Błażej Nowakowski", email = "blazejnowakowski@gmail.com"}]
+dependencies = []
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
