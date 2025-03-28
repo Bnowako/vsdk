@@ -2,7 +2,7 @@ from typing import Literal, Union
 
 from pydantic import BaseModel
 
-from app.voice_agent.domain import RespondToHumanResult
+from vsdk.domain import RespondToHumanResult
 
 
 class StartData(BaseModel):

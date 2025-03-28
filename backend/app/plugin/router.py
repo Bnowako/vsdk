@@ -7,17 +7,17 @@ from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from langchain_openai import ChatOpenAI
 from starlette.templating import Jinja2Templates
 
-from app.voice_agent.conversation.domain import (
+from app.chat.BroAIAgent import BroAgent
+from vsdk.conversation.domain import (
     ConversationEvent,
     ConversationEvents,
     MarkEvent,
     MediaEvent,
 )
-from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
-from app.voice_agent.stt.GroqSTTProcessor import GroqSTTProcessor
-from app.voice_agent.tts.ElevenTTSProcessor import ElevenTTSProcessor
-from app.chat.BroAIAgent import BroAgent
-from app.voice_agent.voice_agent import VoiceAgent
+from vsdk.conversation_orchestrator import ConversationOrchestrator
+from vsdk.stt.GroqSTTProcessor import GroqSTTProcessor
+from vsdk.tts.ElevenTTSProcessor import ElevenTTSProcessor
+from vsdk.voice_agent import VoiceAgent
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

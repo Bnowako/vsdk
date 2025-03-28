@@ -15,9 +15,9 @@ from app.twilio.schemas import (
     TwilioMediaEvent,
     TwilioStartEvent,
 )
-from app.voice_agent.conversation.domain import ConversationEvent
-from app.voice_agent.conversation_orchestrator import ConversationOrchestrator
-from app.voice_agent.domain import RespondToHumanResult
+from vsdk.conversation.domain import ConversationEvent
+from vsdk.conversation_orchestrator import ConversationOrchestrator
+from vsdk.domain import RespondToHumanResult
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

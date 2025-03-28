@@ -24,8 +24,8 @@ from app.chat.stagehand_tools import (
     observe_elements,
     perform_action,
 )
-from app.voice_agent.domain import LLMResult, STTResult
-from app.voice_agent.ttt.base import BaseAgent
+from vsdk.domain import LLMResult, STTResult
+from vsdk.ttt.base import BaseAgent
 
 load_dotenv()
 
