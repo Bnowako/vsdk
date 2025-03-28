@@ -9,6 +9,8 @@ dependencies = [
     "pydantic==2.10.4",
     "python-dotenv==1.0.1",
 
+    "playwright==1.51.0",
+
     "fastapi[standard]>=0.115.11",
     "uvicorn==0.34.0",
     "beanie==1.29.0",
