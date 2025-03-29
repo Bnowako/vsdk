@@ -6,7 +6,12 @@ from fastapi import APIRouter, Request, WebSocket
 from fastapi.templating import Jinja2Templates  # type: ignore
 
 from app.chat.CustomBroAgent import CustomBroAgent
-from app.chat.playwright_tools import browser_snapshot, click_element, type_text
+from app.chat.playwright_tools import (
+    browser_snapshot,
+    click_element,
+    navigate,
+    type_text,
+)
 from app.chat.stagehand_client import stagehand_client
 
 from .schemas import PostUserMessage
@@ -31,7 +36,7 @@ async def chat(websocket: WebSocket):
     conversation_id = str(uuid.uuid4())
     logger.info("WebSocket connection accepted")
 
-    agent = CustomBroAgent(tools=[browser_snapshot, click_element, type_text])
+    agent = CustomBroAgent(tools=[browser_snapshot, click_element, type_text, navigate])
     logger.info("Agent initialized")
 
     while True:

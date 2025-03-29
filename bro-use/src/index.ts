@@ -77,6 +77,22 @@ async function main() {
       }
     });
 
+    const navigateToSchema = z.object({
+      url: z.string().describe('URL to navigate to'),
+    });
+
+    app.post('/navigate', async (req: Request, res: Response) => {
+      try {
+        const validatedParams = navigateToSchema.parse(req.body);
+        await page.goto(validatedParams.url);
+        res.json({ success: true });
+      } catch (err) {
+        console.error('Failed to navigate', err);
+        res.status(500).json({
+          error: err instanceof Error ? err.message : 'Failed to navigate'
+        });
+      }
+    });
 
 
   } catch (err) {

@@ -54,6 +54,18 @@ class PlaywrightClient:
         except httpx.HTTPError as e:
             raise PlaywrightClientError(f"Request failed: {str(e)}")
 
+    async def navigate(self, url: str) -> None:
+        """
+        Navigate to a specified URL.
+
+        Args:
+            url: The URL to navigate to
+
+        Returns:
+            Result of the navigation operation
+        """
+        await self._make_request("POST", "/navigate", json={"url": url})
+
     async def browser_snapshot(self) -> ToolResult:
         """
         Capture accessibility snapshot of the current page, this is better than screenshot

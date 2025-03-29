@@ -47,3 +47,17 @@ async def type_text(element: str, ref: str, text: str, submit: bool = False) -> 
     """
     response = await playwright_client.type_text(element, ref, text, submit)
     return " ".join([content.text for content in response.content])
+
+
+@tool
+async def navigate(url: str) -> None:
+    """
+    Navigate to a specified URL.
+
+    Args:
+        url: The URL to navigate to
+
+    Returns:
+        Result of the navigation operation
+    """
+    await playwright_client.navigate(url)
