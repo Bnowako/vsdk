@@ -15,7 +15,7 @@ app.use(express.json());
 
 async function main() {
   try {
-    const context = new Context("/Users/blazejnowakowski/Projects/vsdk");
+    const context = new Context("/Users/blazejnowakowski/Projects/vsdk/user-data", { headless: false });
     const page = await context.createPage();
     await page.goto("https://bnowako.com");
 
