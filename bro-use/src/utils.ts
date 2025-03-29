@@ -1,171 +1,109 @@
-import { ObserveResult, Page } from "@browserbasehq/stagehand";
-import boxen from "boxen";
-import chalk from "chalk";
-import fs from "fs/promises";
-import { z } from "zod";
+/**
+ * Copyright (c) Microsoft Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-export function announce(message: string, title?: string) {
-  console.log(
-    boxen(message, {
-      padding: 1,
-      margin: 3,
-      title: title || "Stagehand",
-    })
+import type * as playwright from 'playwright';
+import type { ToolResult } from './tool';
+import type { Context } from './context';
+
+async function waitForCompletion<R>(page: playwright.Page, callback: () => Promise<R>): Promise<R> {
+  const requests = new Set<playwright.Request>();
+  let frameNavigated = false;
+  let waitCallback: () => void = () => {};
+  const waitBarrier = new Promise<void>(f => { waitCallback = f; });
+
+  const requestListener = (request: playwright.Request) => requests.add(request);
+  const requestFinishedListener = (request: playwright.Request) => {
+    requests.delete(request);
+    if (!requests.size)
+      waitCallback();
+  };
+
+  const frameNavigateListener = (frame: playwright.Frame) => {
+    if (frame.parentFrame())
+      return;
+    frameNavigated = true;
+    dispose();
+    clearTimeout(timeout);
+    void frame.waitForLoadState('load').then(() => {
+      waitCallback();
+    });
+  };
+
+  const onTimeout = () => {
+    dispose();
+    waitCallback();
+  };
+
+  page.on('request', requestListener);
+  page.on('requestfinished', requestFinishedListener);
+  page.on('framenavigated', frameNavigateListener);
+  const timeout = setTimeout(onTimeout, 10000);
+
+  const dispose = () => {
+    page.off('request', requestListener);
+    page.off('requestfinished', requestFinishedListener);
+    page.off('framenavigated', frameNavigateListener);
+    clearTimeout(timeout);
+  };
+
+  try {
+    const result = await callback();
+    if (!requests.size && !frameNavigated)
+      waitCallback();
+    await waitBarrier;
+    await page.evaluate(() => new Promise(f => setTimeout(f, 1000)));
+    return result;
+  } finally {
+    dispose();
+  }
+}
+
+export async function runAndWait(context: Context, status: string, callback: (page: playwright.Page) => Promise<any>, snapshot: boolean = false): Promise<ToolResult> {
+  const page = context.existingPage();
+  const dismissFileChooser = context.hasFileChooser();
+  await waitForCompletion(page, () => callback(page));
+  if (dismissFileChooser)
+    context.clearFileChooser();
+  const result: ToolResult = snapshot ? await captureAriaSnapshot(context, status) : {
+    content: [{ type: 'text', text: status }],
+  };
+  return result;
+}
+
+export async function captureAriaSnapshot(context: Context, status: string = ''): Promise<ToolResult> {
+  const page = context.existingPage();
+  const lines = [];
+  if (status)
+    lines.push(`${status}`);
+
+  lines.push(
+      '',
+      `- Page URL: ${page.url()}`,
+      `- Page Title: ${await page.title()}`
   );
-}
-
-/**
- * Get an environment variable and throw an error if it's not found
- * @param name - The name of the environment variable
- * @returns The value of the environment variable
- */
-export function getEnvVar(name: string, required = true): string | undefined {
-  const value = process.env[name];
-  if (!value && required) {
-    throw new Error(`${name} not found in environment variables`);
-  }
-  return value;
-}
-
-/**
- * Validate a Zod schema against some data
- * @param schema - The Zod schema to validate against
- * @param data - The data to validate
- * @returns Whether the data is valid against the schema
- */
-export function validateZodSchema(schema: z.ZodTypeAny, data: unknown) {
-  try {
-    schema.parse(data);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function drawObserveOverlay(page: Page, results: ObserveResult[]) {
-  // Convert single xpath to array for consistent handling
-  const xpathList = results.map((result) => result.selector);
-
-  // Filter out empty xpaths
-  const validXpaths = xpathList.filter((xpath) => xpath !== "xpath=");
-
-  await page.evaluate((selectors) => {
-    selectors.forEach((selector) => {
-      let element;
-      if (selector.startsWith("xpath=")) {
-        const xpath = selector.substring(6);
-        element = document.evaluate(
-          xpath,
-          document,
-          null,
-          XPathResult.FIRST_ORDERED_NODE_TYPE,
-          null
-        ).singleNodeValue;
-      } else {
-        element = document.querySelector(selector);
-      }
-
-      if (element instanceof HTMLElement) {
-        const overlay = document.createElement("div");
-        overlay.setAttribute("stagehandObserve", "true");
-        const rect = element.getBoundingClientRect();
-        overlay.style.position = "absolute";
-        overlay.style.left = rect.left + "px";
-        overlay.style.top = rect.top + "px";
-        overlay.style.width = rect.width + "px";
-        overlay.style.height = rect.height + "px";
-        overlay.style.backgroundColor = "rgba(255, 255, 0, 0.3)";
-        overlay.style.pointerEvents = "none";
-        overlay.style.zIndex = "10000";
-        document.body.appendChild(overlay);
-      }
-    });
-  }, validXpaths);
-}
-
-export async function clearOverlays(page: Page) {
-  // remove existing stagehandObserve attributes
-  await page.evaluate(() => {
-    const elements = document.querySelectorAll('[stagehandObserve="true"]');
-    elements.forEach((el) => {
-      const parent = el.parentNode;
-      while (el.firstChild) {
-        parent?.insertBefore(el.firstChild, el);
-      }
-      parent?.removeChild(el);
-    });
-  });
-}
-
-export async function simpleCache(
-  instruction: string,
-  actionToCache: ObserveResult
-) {
-  // Save action to cache.json
-  try {
-    // Read existing cache if it exists
-    let cache: Record<string, ObserveResult> = {};
-    try {
-      const existingCache = await fs.readFile("cache.json", "utf-8");
-      cache = JSON.parse(existingCache);
-    } catch (error) {
-      // File doesn't exist yet, use empty cache
-    }
-
-    // Add new action to cache
-    cache[instruction] = actionToCache;
-
-    // Write updated cache to file
-    await fs.writeFile("cache.json", JSON.stringify(cache, null, 2));
-  } catch (error) {
-    console.error(chalk.red("Failed to save to cache:"), error);
-  }
-}
-
-export async function readCache(
-  instruction: string
-): Promise<ObserveResult | null> {
-  try {
-    const existingCache = await fs.readFile("cache.json", "utf-8");
-    const cache: Record<string, ObserveResult> = JSON.parse(existingCache);
-    return cache[instruction] || null;
-  } catch (error) {
-    return null;
-  }
-}
-
-/**
- * This function is used to act with a cacheable action.
- * It will first try to get the action from the cache.
- * If not in cache, it will observe the page and cache the result.
- * Then it will execute the action.
- * @param instruction - The instruction to act with.
- */
-export async function actWithCache(
-  page: Page,
-  instruction: string
-): Promise<void> {
-  // Try to get action from cache first
-  const cachedAction = await readCache(instruction);
-  if (cachedAction) {
-    console.log(chalk.blue("Using cached action for:"), instruction);
-    await page.act(cachedAction);
-    return;
-  }
-
-  // If not in cache, observe the page and cache the result
-  const results = await page.observe(instruction);
-  console.log(chalk.blue("Got results:"), results);
-
-  // Cache the playwright action
-  const actionToCache = results[0];
-  console.log(chalk.blue("Taking cacheable action:"), actionToCache);
-  await simpleCache(instruction, actionToCache);
-  // OPTIONAL: Draw an overlay over the relevant xpaths
-  await drawObserveOverlay(page, results);
-  await page.waitForTimeout(1000); // Can delete this line, just a pause to see the overlay
-  await clearOverlays(page);
-
-  // Execute the action
-  await page.act(actionToCache);
+  if (context.hasFileChooser())
+    lines.push(`- There is a file chooser visible that requires browser_choose_file to be called`);
+  lines.push(
+      `- Page Snapshot`,
+      '```yaml',
+      await context.allFramesSnapshot(),
+      '```',
+      ''
+  );
+  return {
+    content: [{ type: 'text', text: lines.join('\n') }],
+  };
 }
