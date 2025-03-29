@@ -29,6 +29,7 @@ async function main() {
         const snapshot: ToolResult = await captureAriaSnapshot(context);
         res.json(snapshot);
       } catch (err) {
+        console.error('Failed to navigate', err);
         res.status(500).json({
           error: err instanceof Error ? err.message : 'Failed to navigate'
         });
@@ -46,6 +47,7 @@ async function main() {
         const result = await runAndWait(context, `"${validatedParams.element}" clicked`, () => context.refLocator(validatedParams.ref).click(), true);
         res.json(result);
       } catch (err) {
+        console.error('Failed to click', err);
         res.status(500).json({
           error: err instanceof Error ? err.message : 'Failed to click'
         });
@@ -68,7 +70,8 @@ async function main() {
         res.json(result);
 
       } catch (err) {
-          res.status(500).json({
+        console.error('Failed to type', err);
+        res.status(500).json({
           error: err instanceof Error ? err.message : 'Failed to type'
         });
       }
