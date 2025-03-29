@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.chat.router import router as chat_router
 from app.config import Config
 from app.twilio.router import router as twilio_router
+from app.voice_bro.router import router as voice_bro_router
 from app.vsdk.router import router as vsdk_router
 
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     app.include_router(twilio_router)
     app.include_router(vsdk_router)
     app.include_router(chat_router)
+    app.include_router(voice_bro_router)
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
     app.add_middleware(
