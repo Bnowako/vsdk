@@ -52,7 +52,7 @@ class PlaywrightClient:
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as e:
-            raise StagehandError(f"Request failed: {str(e)}")
+            raise PlaywrightClientError(f"Request failed: {str(e)}")
 
     async def browser_snapshot(self) -> ToolResult:
         """
@@ -66,8 +66,46 @@ class PlaywrightClient:
         logger.info(f"Browser snapshot response: {response}")
         return ToolResult(**response)
 
+    async def click_element(self, element: str, ref: str) -> ToolResult:
+        """
+        Click on an element specified by its reference.
 
-class StagehandError(Exception):
+        Args:
+            element: Human-readable element description
+            ref: Exact target element reference from the page snapshot
+
+        Returns:
+            Result of the click operation
+        """
+        response = await self._make_request(
+            "POST", "/click", json={"element": element, "ref": ref}
+        )
+        return ToolResult(**response)
+
+    async def type_text(
+        self, element: str, ref: str, text: str, submit: bool = False
+    ) -> ToolResult:
+        """
+        Type text into an element specified by its reference.
+
+        Args:
+            element: Human-readable element description
+            ref: Exact target element reference from the page snapshot
+            text: Text to type into the element
+            submit: Whether to submit entered text (press Enter after)
+
+        Returns:
+            Result of the type operation
+        """
+        response = await self._make_request(
+            "POST",
+            "/type",
+            json={"element": element, "ref": ref, "text": text, "submit": submit},
+        )
+        return ToolResult(**response)
+
+
+class PlaywrightClientError(Exception):
     """Custom exception for Stagehand client errors."""
 
     pass
