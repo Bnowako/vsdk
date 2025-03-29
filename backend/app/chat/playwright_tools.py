@@ -55,7 +55,7 @@ async def navigate(url: str) -> None:
     Navigate to a specified URL.
 
     Args:
-        url: The URL to navigate to
+        url: The URL to navigate to. URL should be in a https:// format, without www subdomain
 
     Returns:
         Result of the navigation operation
