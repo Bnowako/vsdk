@@ -3,14 +3,10 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Request, WebSocket
-from fastapi.templating import Jinja2Templates
-from langchain_core.tools import tool  # type: ignore
-from playwright.async_api import (
-    async_playwright,
-)
+from fastapi.templating import Jinja2Templates  # type: ignore
 
-from app.browser.browser_manipulator import Context, capture_aria_snapshot
 from app.chat.CustomBroAgent import CustomBroAgent
+from app.chat.playwright_tools import browser_snapshot
 from app.chat.stagehand_client import stagehand_client
 
 from .schemas import PostUserMessage
@@ -35,32 +31,18 @@ async def chat(websocket: WebSocket):
     conversation_id = str(uuid.uuid4())
     logger.info("WebSocket connection accepted")
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
-        page = await browser.new_page()
+    agent = CustomBroAgent(tools=[browser_snapshot])
+    logger.info("Agent initialized")
 
-        await page.goto("https://bnowako.com")
-        context = Context(browser, page)
+    while True:
+        data = await websocket.receive_text()
+        logger.info(f"Received message: {data}")
 
-        @tool
-        async def get_page_content():
-            """
-            Get the content of the current page.
-            """
-            return await capture_aria_snapshot(context)
+        message = PostUserMessage(**json.loads(data))
 
-        agent = CustomBroAgent(tools=[get_page_content])
-        logger.info("Agent initialized")
-
-        while True:
-            data = await websocket.receive_text()
-            logger.info(f"Received message: {data}")
-
-            message = PostUserMessage(**json.loads(data))
-
-            async for response in agent.chat_astream(message.content, conversation_id):
-                logger.info(f"WS sent: {response.model_dump_json()}")
-                await websocket.send_text(response.model_dump_json())
+        async for response in agent.chat_astream(message.content, conversation_id):
+            logger.info(f"WS sent: {response.model_dump_json()}")
+            await websocket.send_text(response.model_dump_json())
 
 
 @router.get("/chat/status")

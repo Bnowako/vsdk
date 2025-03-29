@@ -1,6 +1,8 @@
 import asyncio
-from typing import List, Optional
+from typing import List, Optional, Union
 
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool  # type: ignore
 from playwright.async_api import (
     Browser,
     ElementHandle,
@@ -20,6 +22,24 @@ class Context:
 
     def existing_page(self) -> Page:
         return self.page
+
+    def ref_locator(self, ref: str) -> Locator:
+        import re
+
+        page = self.existing_page()
+        frame: Union[Frame, Locator] = page.main_frame
+
+        match = re.match(r"^f(\d+)(.*)", ref)
+        if match:
+            frame_index = int(match.group(1))
+            if not self._last_snapshot_frames[frame_index]:
+                raise ValueError(
+                    "Frame does not exist. Provide ref from the most current snapshot."
+                )
+            frame = self._last_snapshot_frames[frame_index]
+            ref = match.group(2)
+
+        return frame.locator(f"aria-ref={ref}")
 
     # todo debug this function and make sure I know how it
     async def all_frames_snapshot(self) -> str:
@@ -72,6 +92,37 @@ async def capture_aria_snapshot(context: Context) -> List[str]:
     return lines
 
 
+@tool
+async def browser_snapshot(config: RunnableConfig) -> List[str]:
+    """
+    Capture the current page content.
+    """
+    context = config.get("configurable", {}).get("context", None)
+    if not context:
+        raise ValueError("Context not found in config")
+
+    return await capture_aria_snapshot(context)
+
+
+@tool
+async def browser_click(ref: str, config: RunnableConfig) -> None:
+    """
+    Perform click on a web page.
+
+    Args:
+        ref: Exact target element reference from the page snapshot.
+    """
+    # https://playwright.dev/python/docs/locators#locate-by-css-or-xpath
+    context = config.get("configurable", {}).get("context", None)
+    if not context:
+        raise ValueError("Context not found in config")
+
+    await context.ref_locator(ref).click()
+
+
+bro_tools = [browser_snapshot, browser_click]
+
+
 async def main() -> None:
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
@@ -81,6 +132,12 @@ async def main() -> None:
         context = Context(browser, page)
         snapshot = await capture_aria_snapshot(context)
         print("\n".join(snapshot))
+
+        await context.ref_locator('link "about"').click()
+
+        snapshot = await capture_aria_snapshot(context)
+        print("\n".join(snapshot))
+
         await browser.close()
 
 
