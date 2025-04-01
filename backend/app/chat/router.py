@@ -3,15 +3,11 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Request, WebSocket
-from fastapi.templating import Jinja2Templates  # type: ignore
+from fastapi.templating import Jinja2Templates
+from langchain_mcp_adapters.tools import load_mcp_tools
+from mcp import ClientSession, StdioServerParameters, stdio_client  # type: ignore
 
 from app.chat.CustomBroAgent import CustomBroAgent
-from app.chat.playwright_tools import (
-    browser_snapshot,
-    click_element,
-    navigate,
-    type_text,
-)
 from app.chat.stagehand_client import stagehand_client
 
 from .schemas import PostUserMessage
@@ -24,6 +20,14 @@ logger.setLevel(logging.INFO)
 templates = Jinja2Templates(directory="templates")
 
 
+# Create server parameters for stdio connection
+server_params = StdioServerParameters(
+    command="npx",  # Executable
+    args=["@playwright/mcp@latest"],  # Optional command line arguments
+    env=None,  # Optional environment variables
+)
+
+
 @router.get("/chat")
 async def chat_page(request: Request):
     return templates.TemplateResponse("chat.html", {"request": request})
@@ -33,21 +37,29 @@ async def chat_page(request: Request):
 @router.websocket("/chat")
 async def chat(websocket: WebSocket):
     await websocket.accept()
-    conversation_id = str(uuid.uuid4())
-    logger.info("WebSocket connection accepted")
+    async with stdio_client(server_params) as (read_stream, write_stream):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            lang_tools = await load_mcp_tools(session)
+            logger.info(f"Lang tools: {lang_tools}")
 
-    agent = CustomBroAgent(tools=[browser_snapshot, click_element, type_text, navigate])
-    logger.info("Agent initialized")
+            conversation_id = str(uuid.uuid4())
+            logger.info("WebSocket connection accepted")
 
-    while True:
-        data = await websocket.receive_text()
-        logger.info(f"Received message: {data}")
+            agent = CustomBroAgent(tools=lang_tools)
+            logger.info("Agent initialized")
 
-        message = PostUserMessage(**json.loads(data))
+            while True:
+                data = await websocket.receive_text()
+                logger.info(f"Received message: {data}")
 
-        async for response in agent.chat_astream(message.content, conversation_id):
-            logger.info(f"WS sent: {response.model_dump_json()}")
-            await websocket.send_text(response.model_dump_json())
+                message = PostUserMessage(**json.loads(data))
+
+                async for response in agent.chat_astream(
+                    message.content, conversation_id
+                ):
+                    logger.info(f"WS sent: {response.model_dump_json()}")
+                    await websocket.send_text(response.model_dump_json())
 
 
 @router.get("/chat/status")
