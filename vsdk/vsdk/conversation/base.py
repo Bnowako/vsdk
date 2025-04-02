@@ -70,9 +70,9 @@ class AgentSpeech:
 
 
 class AgentVoice:
-    def __init__(self, sid: str):
+    def __init__(self, id: str):
         self.speeches: List[AgentSpeech] = []
-        self.sid = sid
+        self.id = id
 
     @property
     def last_speech(self):
@@ -84,7 +84,7 @@ class AgentVoice:
 
     def chunk_sent(self, chunk: bytes):
         mark_id = (
-            self.sid
+            self.id
             + "_"
             + str(self.speeches_count - 1)
             + "_"
