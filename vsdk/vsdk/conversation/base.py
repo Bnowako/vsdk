@@ -141,38 +141,38 @@ class AgentVoice:
 
 class HumanVoice:
     def __init__(self):
-        self.pcm_audio_buffer: bytes = b""
-        self.new_pcm_audio: bytes = b""
-        self.last_human_speech: bytes = b""
-        self.human_speech_without_response: bytes = b""
+        self._pcm_audio_buffer: bytes = b""
+        self._new_pcm_audio: bytes = b""
+        self._last_human_speech: bytes = b""
+        self._human_speech_without_response: bytes = b""
 
     # Human Voice
     def audio_received(self, pcm_audio: bytes) -> None:
-        self.new_pcm_audio += pcm_audio
-        self.pcm_audio_buffer += pcm_audio
+        self._new_pcm_audio += pcm_audio
+        self._pcm_audio_buffer += pcm_audio
         logger.debug(
-            f"👩🏼🗣️ Audio of length: {len(pcm_audio)} received. Updated state {self.state_string()}"
+            f"👩🏼🗣️ Audio of length: {len(pcm_audio)} received. Updated state {self._state_string()}"
         )
 
     def clear_human_speech(self):
-        logger.debug(f"👩🏼🗣️ Clearing client data state {self.state_string()}")
-        self.pcm_audio_buffer = b""
+        logger.debug(f"👩🏼🗣️ Clearing client data state {self._state_string()}")
+        self._pcm_audio_buffer = b""
 
     def get_data_to_process_and_clear(self) -> bytes:
         k = (
-            len(self.new_pcm_audio) // Config.Audio.silero_samples_size_bytes
+            len(self._new_pcm_audio) // Config.Audio.silero_samples_size_bytes
         ) * Config.Audio.silero_samples_size_bytes
-        data_to_process = self.new_pcm_audio[:k]
-        self.new_pcm_audio = self.new_pcm_audio[k:]
+        data_to_process = self._new_pcm_audio[:k]
+        self._new_pcm_audio = self._new_pcm_audio[k:]
         logger.debug(
-            f"✨👩🏼🗣️ Took audio of length: {len(data_to_process)}. Current pcm_audio_buffer length: {len(self.pcm_audio_buffer)}, Current new audio length: {len(self.new_pcm_audio)}"
+            f"✨👩🏼🗣️ Took audio of length: {len(data_to_process)}. Current pcm_audio_buffer length: {len(self._pcm_audio_buffer)}, Current new audio length: {len(self._new_pcm_audio)}"
         )
         return data_to_process
 
     def human_speech_ended(self, speech_result: VADResult):
         logger.debug("👩🏼🗣️ Human speech ended. ")  # todo add more logs
         if speech_result.end_sample is not None:
-            self.last_human_speech = self._get_audio(
+            self._last_human_speech = self._get_audio(
                 from_sample=speech_result.start_sample,
                 to_sample=speech_result.end_sample,
             )
@@ -184,7 +184,7 @@ class HumanVoice:
 
     def prepare_human_speech_for_interpretation(
         self, human_speech_without_response_buffers: List[bytes]
-    ):
+    ) -> bytes:
         """
         Prepare human speech for interpretation by adding all previous human speeches and last human speech
         This function will cancel all unfinished tasks and add them to the buffer
@@ -196,15 +196,23 @@ class HumanVoice:
             human_speech_without_response = (
                 (b"\x00" * 2 * 80).join(human_speech_without_response_buffers)
                 + b"\x00" * 2 * 80
-                + self.last_human_speech
+                + self._last_human_speech
             )
-            self.human_speech_without_response = human_speech_without_response
+            self._human_speech_without_response = human_speech_without_response
         else:
-            self.human_speech_without_response = self.last_human_speech
+            self._human_speech_without_response = self._last_human_speech
+
+        return self._human_speech_without_response
+
+    def is_new_audio_ready_to_process(self):
+        return len(self._new_pcm_audio) >= Config.Audio.silero_samples_size_bytes
+
+    def get_human_speech_without_response(self):
+        return self._human_speech_without_response
 
     def _get_audio(self, from_sample: int, to_sample: int):
         logger.info(
-            f"👩🏼🗣️ Get audio requested, Requested audio length: {(to_sample - from_sample) // Config.Audio.bytes_per_sample / Config.Audio.sample_rate}s. pcm_audio_buffer length: {(len(self.pcm_audio_buffer) // Config.Audio.bytes_per_sample) / Config.Audio.sample_rate}s"
+            f"👩🏼🗣️ Get audio requested, Requested audio length: {(to_sample - from_sample) // Config.Audio.bytes_per_sample / Config.Audio.sample_rate}s. pcm_audio_buffer length: {(len(self._pcm_audio_buffer) // Config.Audio.bytes_per_sample) / Config.Audio.sample_rate}s"
         )
         from_bytes = (
             from_sample * Config.Audio.bytes_per_sample
@@ -212,13 +220,10 @@ class HumanVoice:
         to_bytes = (
             to_sample * Config.Audio.bytes_per_sample
         )  # 2 bytes per sample for 16-bit audio
-        return self.pcm_audio_buffer[from_bytes:to_bytes]
+        return self._pcm_audio_buffer[from_bytes:to_bytes]
 
-    def state_string(self):
-        return f"Conversation state:  new_pcm_audio: {len(self.new_pcm_audio)} pcm_audio_buffer: {len(self.pcm_audio_buffer)} human_speech_without_response: {len(self.human_speech_without_response)}"  # todo add more to this log
-
-    def is_new_audio_ready_to_process(self):
-        return len(self.new_pcm_audio) >= Config.Audio.silero_samples_size_bytes
+    def _state_string(self):
+        return f"Conversation state:  new_pcm_audio: {len(self._new_pcm_audio)} pcm_audio_buffer: {len(self._pcm_audio_buffer)} human_speech_without_response: {len(self._human_speech_without_response)}"  # todo add more to this log
 
 
 class Conversation:
@@ -249,17 +254,14 @@ class Conversation:
     def human_speech_ended(self, speech_result: VADResult) -> None:
         self.human_voice.human_speech_ended(speech_result=speech_result)
 
-    def prepare_human_speech_for_interpretation(self) -> None:
-        human_speech_without_response_buffers = self._cancel_unfinished_tasks()
-        self.human_voice.prepare_human_speech_for_interpretation(
-            human_speech_without_response_buffers=human_speech_without_response_buffers
-        )
-
     def is_new_audio_ready_to_process(self):
         return self.human_voice.is_new_audio_ready_to_process()
 
     def get_human_speech_without_response(self):
-        return self.human_voice.human_speech_without_response
+        human_speech_without_response_buffers = self._cancel_unfinished_tasks()
+        return self.human_voice.prepare_human_speech_for_interpretation(
+            human_speech_without_response_buffers=human_speech_without_response_buffers
+        )
 
     # Audio OUT
     def new_agent_speech_start(self):
@@ -284,12 +286,10 @@ class Conversation:
         return self.agent_voice.is_speaking()
 
     # Thinking
-    def add_agent_response_task(self, task: Task[None]):
+    def add_agent_response_task(self, task: Task[None], invoked_with_speech: bytes):
         logger.debug("🧠 Adding agent response task.")
         self.agent_response_tasks.append(
-            AgentResponseTask(
-                task=task, human_speech=self.get_human_speech_without_response()
-            )
+            AgentResponseTask(task=task, human_speech=invoked_with_speech)
         )
 
     def _cancel_unfinished_tasks(self) -> List[bytes]:

@@ -6,6 +6,7 @@ from typing import Awaitable, Callable
 from langchain_openai import ChatOpenAI
 
 from vsdk.config import Config
+from vsdk.conversation.base import Conversation, ConversationState
 from vsdk.conversation.domain import (
     ConversationEvent,
     MarkEvent,
@@ -15,7 +16,6 @@ from vsdk.conversation.domain import (
     StartRespondingEvent,
     StopSpeakingEvent,
 )
-from vsdk.conversation.base import Conversation, ConversationState
 from vsdk.domain import RespondToHumanResult
 from vsdk.stt.GroqSTTProcessor import GroqSTTProcessor
 from vsdk.tts.ElevenTTSProcessor import ElevenTTSProcessor
@@ -91,15 +91,17 @@ class ConversationOrchestrator:
                             | ConversationState.SHORT_SPEECH
                             | ConversationState.LONG_SPEECH
                         ):
-                            self.conversation.prepare_human_speech_for_interpretation()
+                            human_speech = (
+                                self.conversation.get_human_speech_without_response()
+                            )
                             self.conversation.add_agent_response_task(
                                 task=asyncio.create_task(
                                     self._handle_respond_to_human(
-                                        self.conversation,
-                                        self.voice_agent,
+                                        human_speech,
                                         self.callback,
                                     )
-                                )
+                                ),
+                                invoked_with_speech=human_speech,
                             )
 
                         case _:
@@ -111,29 +113,28 @@ class ConversationOrchestrator:
 
     async def _handle_respond_to_human(
         self,
-        conversation: Conversation,
-        voice_agent: VoiceAgent,
+        human_speech: bytes,
         callback: Callable[[ConversationEvent], Awaitable[None]],
     ):
         try:
             await callback(StartRespondingEvent())
             result: RespondToHumanResult = RespondToHumanResult.empty()
-            conversation.new_agent_speech_start()
-            async for chunk in voice_agent.respond_to_human(
-                pcm_audio_buffer=conversation.get_human_speech_without_response(),
-                sid=conversation.id,
+            self.conversation.new_agent_speech_start()
+            async for chunk in self.voice_agent.respond_to_human(
+                pcm_audio_buffer=human_speech,
+                sid=self.conversation.id,
                 callback=lambda x: result.update(x),
             ):
                 await callback(
                     MediaEvent(
                         audio=chunk.audio,
                         base64_audio=chunk.base64_audio,
-                        sid=conversation.id,
+                        sid=self.conversation.id,
                     )
                 )
-                mark_id = conversation.agent_speech_sent(chunk.audio)
+                mark_id = self.conversation.agent_speech_sent(chunk.audio)
 
-                await callback(MarkEvent(mark_id=mark_id, sid=conversation.id))
+                await callback(MarkEvent(mark_id=mark_id, sid=self.conversation.id))
 
             await callback(ResultEvent(result=result))
         except Exception as e:
