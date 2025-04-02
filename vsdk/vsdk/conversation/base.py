@@ -178,7 +178,7 @@ class HumanVoice:
             )
             self.clear_human_speech()
         else:
-            logger.warning(
+            logger.error(
                 f"👩🏼🗣️ Human speech ended invoked but end_sample is None. start_sample: {speech_result.start_sample}, end_sample: {speech_result.end_sample}"
             )
 
