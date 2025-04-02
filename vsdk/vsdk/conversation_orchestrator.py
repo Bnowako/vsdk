@@ -66,7 +66,11 @@ class ConversationOrchestrator:
                     self.conversation.is_new_audio_ready_to_process()
                 ):  # todo add queue and wait here for new audio ready to process
                     vad_result = self._check_for_speech()
-                    conversation_state = self.conversation.vad_update(vad_result)
+                    if vad_result is not None and vad_result.ended:
+                        self.conversation.human_speech_ended(vad_result)
+                    conversation_state = self.conversation.get_conversation_state(
+                        vad_result
+                    )
                     logger.debug(f"🖥️ Conversation state: {conversation_state}")
 
                     match conversation_state:

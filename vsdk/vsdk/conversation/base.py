@@ -320,7 +320,7 @@ class Conversation:
         else:
             logger.warning("💬 Audio interpreter loop not found. Cannot cancel.")
 
-    def vad_update(self, vad_result: VADResult | None):
+    def get_conversation_state(self, vad_result: VADResult | None):
         if vad_result is None:
             return ConversationState.HUMAN_SILENT
 
@@ -328,9 +328,6 @@ class Conversation:
             logger.info(
                 f"Human speach ended. Speach length: {vad_result.end_sample or 0 - vad_result.start_sample}. "  # todo add more to his log
             )
-
-            self.human_speech_ended(vad_result)
-
             if self.agent_was_interrupted() and vad_result.is_short():
                 logger.info("🎙️🏁Short Human speech, agent was interrupted")
                 return ConversationState.SHORT_INTERRUPTION_DURING_AGENT_SPEAKING

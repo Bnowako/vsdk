@@ -1,6 +1,7 @@
 from unittest.mock import Mock
 
 import pytest
+
 from vsdk.conversation.base import Conversation, ConversationState
 
 
@@ -23,7 +24,7 @@ class MockVADResult:
 def test_human_silent():
     """Test when no speech is detected (speech_result is None)."""
     conversation = Conversation(id="test_sid")
-    state = conversation.vad_update(vad_result=None)
+    state = conversation.get_conversation_state(vad_result=None)
     assert state == ConversationState.HUMAN_SILENT
 
 
@@ -35,7 +36,7 @@ def test_short_speech():
     conversation.agent_was_interrupted = Mock(return_value=False)
     conversation.human_speech_ended = Mock()
 
-    state = conversation.vad_update(vad_result=mock_speech_result)  # type: ignore
+    state = conversation.get_conversation_state(vad_result=mock_speech_result)  # type: ignore
     assert state == ConversationState.SHORT_SPEECH
 
 
@@ -47,7 +48,7 @@ def test_long_speech():
     conversation.agent_was_interrupted = Mock(return_value=False)
     conversation.human_speech_ended = Mock()
 
-    state = conversation.vad_update(vad_result=mock_speech_result)  # type: ignore
+    state = conversation.get_conversation_state(vad_result=mock_speech_result)  # type: ignore
     assert state == ConversationState.LONG_SPEECH
 
 
@@ -59,7 +60,7 @@ def test_short_interruption_during_agent_speaking():
     conversation.agent_was_interrupted = Mock(return_value=True)
     conversation.human_speech_ended = Mock()
 
-    state = conversation.vad_update(vad_result=mock_speech_result)  # type: ignore
+    state = conversation.get_conversation_state(vad_result=mock_speech_result)  # type: ignore
     assert state == ConversationState.SHORT_INTERRUPTION_DURING_AGENT_SPEAKING
 
 
@@ -71,7 +72,7 @@ def test_long_interruption_during_agent_speaking():
     conversation.agent_was_interrupted = Mock(return_value=True)
     conversation.human_speech_ended = Mock()
 
-    state = conversation.vad_update(vad_result=mock_speech_result)  # type: ignore
+    state = conversation.get_conversation_state(vad_result=mock_speech_result)  # type: ignore
     assert state == ConversationState.LONG_INTERRUPTION_DURING_AGENT_SPEAKING
 
 
@@ -82,7 +83,7 @@ def test_both_speaking():
     conversation = Conversation(id="test_sid")
     conversation.is_agent_speaking = Mock(return_value=True)
 
-    state = conversation.vad_update(vad_result=mock_speech_result)  # type: ignore
+    state = conversation.get_conversation_state(vad_result=mock_speech_result)  # type: ignore
     assert state == ConversationState.BOTH_SPEAKING
 
 
@@ -93,7 +94,7 @@ def test_human_started_speaking():
     conversation = Conversation(id="test_sid")
     conversation.is_agent_speaking = Mock(return_value=False)
 
-    state = conversation.vad_update(vad_result=mock_speech_result)  # type: ignore
+    state = conversation.get_conversation_state(vad_result=mock_speech_result)  # type: ignore
     assert state == ConversationState.HUMAN_STARTED_SPEAKING
 
 
@@ -108,4 +109,4 @@ def test_unmatched_state_raises_error():
     conversation.human_speech_ended = Mock()
 
     with pytest.raises(ValueError):
-        conversation.vad_update(vad_result=mock_speech_result)  # type: ignore
+        conversation.get_conversation_state(vad_result=mock_speech_result)  # type: ignore
