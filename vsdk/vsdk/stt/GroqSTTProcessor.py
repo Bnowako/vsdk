@@ -3,10 +3,11 @@ import wave
 from io import BytesIO
 
 from vsdk.config import Config
+from vsdk.stt.base import BaseSTT
 from vsdk.stt.domain import STTResult
 
 
-class GroqSTTProcessor:
+class GroqSTTProcessor(BaseSTT):
     def __init__(
         self,
         groq: Config.Groq = Config.Groq(),

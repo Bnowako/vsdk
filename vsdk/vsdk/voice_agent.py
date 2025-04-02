@@ -9,7 +9,7 @@ from vsdk.domain import (
     RespondToHumanResult,
     TTSResult,
 )
-from vsdk.stt.GroqSTTProcessor import GroqSTTProcessor
+from vsdk.stt.base import BaseSTT
 from vsdk.tts.ElevenTTSProcessor import AudioChunk, ElevenTTSProcessor
 from vsdk.ttt.base import BaseAgent
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class VoiceAgent:
     def __init__(
         self,
-        stt: GroqSTTProcessor,
+        stt: BaseSTT,
         tts: ElevenTTSProcessor,
         agent: BaseAgent,
     ) -> None:
