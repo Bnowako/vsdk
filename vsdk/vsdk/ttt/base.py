@@ -15,12 +15,3 @@ class BaseAgent(ABC):
         callback: Optional[Callable[[LLMResult], None]] = None,
     ) -> AsyncIterator[str]:
         pass
-
-    @abstractmethod
-    def astream(
-        self,
-        stt_result: STTResult,
-        conversation_id: str,
-        callback: Optional[Callable[[LLMResult], None]] = None,
-    ) -> AsyncIterator[str]:
-        pass

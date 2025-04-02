@@ -8,6 +8,7 @@ from typing import AsyncIterator, Iterator, List, Optional, Tuple
 import websockets
 
 from vsdk.config import Config, Secrets
+from vsdk.tts.base import BaseTTS
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def split_by_words_or_by_fixed_interval_if_silence(audio_chunk: AudioChunk):
 
 # todo THIS FAILS REALLY QUIETLY IF THERE ARE SOME ISSUES WITH ELEVEN API, FIX THIS!!!!
 # to reproduce for example break api key
-class ElevenTTSProcessor:
+class ElevenTTSProcessor(BaseTTS):
     def __init__(
         self,
         eleven: Config.Eleven = Config.Eleven(),

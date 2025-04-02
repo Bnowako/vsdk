@@ -10,7 +10,8 @@ from vsdk.domain import (
     TTSResult,
 )
 from vsdk.stt.base import BaseSTT
-from vsdk.tts.ElevenTTSProcessor import AudioChunk, ElevenTTSProcessor
+from vsdk.tts.ElevenTTSProcessor import AudioChunk
+from vsdk.tts.base import BaseTTS
 from vsdk.ttt.base import BaseAgent
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ class VoiceAgent:
     def __init__(
         self,
         stt: BaseSTT,
-        tts: ElevenTTSProcessor,
+        tts: BaseTTS,
         agent: BaseAgent,
     ) -> None:
         self.stt = stt
