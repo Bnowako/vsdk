@@ -117,12 +117,14 @@ class ConversationOrchestrator:
         callback: Callable[[ConversationEvent], Awaitable[None]],
     ):
         try:
-            await callback(StartRespondingEvent())
             result: RespondToHumanResult = RespondToHumanResult.empty()
+
+            await callback(StartRespondingEvent())
             self.conversation.new_agent_speech_start()
+
             async for chunk in self.voice_agent.respond_to_human(
                 pcm_audio_buffer=human_speech,
-                sid=self.conversation.id,
+                id=self.conversation.id,
                 callback=lambda x: result.update(x),
             ):
                 await callback(

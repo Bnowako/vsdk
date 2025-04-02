@@ -30,7 +30,7 @@ class VoiceAgent:
     async def respond_to_human(
         self,
         pcm_audio_buffer: bytes,
-        sid: str,
+        id: str,
         callback: Callable[[RespondToHumanResult], None],
     ) -> AsyncIterator[AudioChunk]:
         logger.info(
@@ -43,7 +43,7 @@ class VoiceAgent:
         llm_result = LLMResult.empty()
         output_llm_stream = self.agent(
             stt_result,
-            conversation_id=sid,
+            conversation_id=id,
             callback=lambda x: llm_result.update(x),
         )
 
