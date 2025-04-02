@@ -1,31 +1,16 @@
 import asyncio
 import base64
-import dataclasses
 import json
 import logging
-from typing import AsyncIterator, Iterator, List, Optional, Tuple
+from typing import AsyncIterator, Iterator, List, Tuple
 
 import websockets
 
 from vsdk.config import Config, Secrets
-from vsdk.tts.base import BaseTTS
+from vsdk.tts.base import AudioChunk, BaseTTS, NormalizedAlignment
 
 # Set up logger
 logger = logging.getLogger(__name__)
-
-
-@dataclasses.dataclass
-class NormalizedAlignment:
-    chars: List[str]
-    charStartTimesMs: List[int]
-    charDurationsMs: List[int]
-
-
-@dataclasses.dataclass
-class AudioChunk:
-    audio: bytes
-    base64_audio: str
-    normalized_alignment: Optional[NormalizedAlignment]
 
 
 def calculate_word_start_times(
@@ -85,7 +70,7 @@ class ElevenTTSProcessor(BaseTTS):
         try:
             response = self.eleven.client.text_to_speech.convert_as_stream(
                 voice_id=self.eleven.voice,
-                optimize_streaming_latency="0",
+                optimize_streaming_latency=0,
                 output_format=self.eleven.output_format,
                 text=text,
                 model_id=self.eleven.model,

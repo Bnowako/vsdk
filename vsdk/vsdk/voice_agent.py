@@ -10,8 +10,7 @@ from vsdk.domain import (
     TTSResult,
 )
 from vsdk.stt.base import BaseSTT
-from vsdk.tts.ElevenTTSProcessor import AudioChunk
-from vsdk.tts.base import BaseTTS
+from vsdk.tts.base import AudioChunk, BaseTTS
 from vsdk.ttt.base import BaseAgent
 
 logger = logging.getLogger(__name__)
