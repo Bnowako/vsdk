@@ -22,7 +22,7 @@ import pytest
 from vsdk.conversation.domain import ConversationEvent
 from vsdk.conversation_orchestrator import ConversationOrchestrator
 from vsdk.domain import RespondToHumanResult
-from vsdk.stt.domain import STTResult
+from vsdk.stt.base import STTResult
 from vsdk.tts.base import AudioChunk
 
 logger = logging.getLogger(__name__)

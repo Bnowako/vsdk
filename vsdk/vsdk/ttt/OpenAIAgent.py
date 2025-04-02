@@ -17,9 +17,8 @@ from langchain_core.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 
-from vsdk.stt.domain import STTResult
-from vsdk.ttt.base import BaseAgent
-from vsdk.ttt.domain import LLMResult
+from vsdk.stt.base import STTResult
+from vsdk.ttt.base import BaseAgent, LLMResult
 
 logger = logging.getLogger(__name__)
 

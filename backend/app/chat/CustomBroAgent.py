@@ -19,8 +19,8 @@ from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from vsdk.domain import LLMResult, STTResult
-from vsdk.ttt.base import BaseAgent
+from vsdk.stt.base import STTResult
+from vsdk.ttt.base import BaseAgent, LLMResult
 
 load_dotenv()
 

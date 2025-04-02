@@ -3,8 +3,7 @@ import wave
 from io import BytesIO
 
 from vsdk.config import Config
-from vsdk.stt.base import BaseSTT
-from vsdk.stt.domain import STTResult
+from vsdk.stt.base import BaseSTT, STTResult
 
 
 class GroqSTTProcessor(BaseSTT):

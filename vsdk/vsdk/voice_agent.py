@@ -5,13 +5,11 @@ from typing import AsyncIterator
 
 from vsdk.config import Config
 from vsdk.domain import (
-    LLMResult,
     RespondToHumanResult,
-    TTSResult,
 )
 from vsdk.stt.base import BaseSTT
-from vsdk.tts.base import AudioChunk, BaseTTS
-from vsdk.ttt.base import BaseAgent
+from vsdk.tts.base import AudioChunk, BaseTTS, TTSResult
+from vsdk.ttt.base import BaseAgent, LLMResult
 
 logger = logging.getLogger(__name__)
 

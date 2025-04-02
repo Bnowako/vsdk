@@ -1,8 +1,8 @@
 from pydantic import BaseModel
 
-from vsdk.stt.domain import STTResult
-from vsdk.tts.domain import TTSResult
-from vsdk.ttt.domain import LLMResult
+from vsdk.stt.base import STTResult
+from vsdk.tts.base import TTSResult
+from vsdk.ttt.base import LLMResult
 
 
 class RespondToHumanResult(BaseModel):
