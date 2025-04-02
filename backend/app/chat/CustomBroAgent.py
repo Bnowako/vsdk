@@ -41,7 +41,7 @@ class CustomBroAgent(BaseAgent):
     def __init__(
         self,
         tools: List[BaseTool],
-        llm: BaseChatModel = ChatOpenAI(model="gpt-4o"),
+        llm: BaseChatModel = ChatOpenAI(model="gpt-4o-mini"),
     ) -> None:
         logger.info("Initializing LLMAgent")
         in_memory_store = MemorySaver()

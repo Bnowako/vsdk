@@ -4,10 +4,11 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
-from langchain_openai import ChatOpenAI
 from starlette.templating import Jinja2Templates
+from mcp import ClientSession, StdioServerParameters, stdio_client  # type: ignore
+from langchain_mcp_adapters.tools import load_mcp_tools
 
-from app.chat.BroAIAgent import BroAgent
+from app.chat.CustomBroAgent import CustomBroAgent
 from vsdk.conversation.domain import (
     ConversationEvent,
     ConversationEvents,
@@ -25,6 +26,13 @@ logging.basicConfig(level=logging.INFO)
 router = APIRouter(prefix="/vsdk", tags=["vsdk"])
 templates = Jinja2Templates(directory="templates")
 
+# Create server parameters for stdio connection
+server_params = StdioServerParameters(
+    command="npx",  # Executable
+    args=["@playwright/mcp@latest"],  # Optional command line arguments
+    env=None,  # Optional environment variables
+)
+
 
 @router.get("/")
 async def index(request: Request):
@@ -37,53 +45,63 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     logger.info("Connection accepted")
 
-    async def conversation_events_handler(x: ConversationEvent):
-        await handle_conversation_event(x, websocket)
+    async with stdio_client(server_params) as (read_stream, write_stream):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            lang_tools = await load_mcp_tools(session)
+            logger.info(f"Lang tools: {lang_tools}")
 
-    conversation_orchestrator: ConversationOrchestrator = ConversationOrchestrator(
-        conversation_id=str(uuid.uuid4()),
-        callback=conversation_events_handler,
-        voice_agent=VoiceAgent(
-            tts=ElevenTTSProcessor(),
-            stt=GroqSTTProcessor(),
-            agent=BroAgent(
-                llm=ChatOpenAI(model="gpt-4o"),
-            ),
-        ),
-    )
-    try:
-        while True:
+            logger.info("WebSocket connection accepted")
+
+            agent = CustomBroAgent(tools=lang_tools)
+
+            async def conversation_events_handler(x: ConversationEvent):
+                await handle_conversation_event(x, websocket)
+
+            conversation_orchestrator: ConversationOrchestrator = (
+                ConversationOrchestrator(
+                    conversation_id=str(uuid.uuid4()),
+                    callback=conversation_events_handler,
+                    voice_agent=VoiceAgent(
+                        tts=ElevenTTSProcessor(),
+                        stt=GroqSTTProcessor(),
+                        agent=agent,
+                    ),
+                )
+            )
             try:
-                message = await websocket.receive_text()
-                data = json.loads(message)
-                event_type: ConversationEvents = data["type"]
+                while True:
+                    try:
+                        message = await websocket.receive_text()
+                        data = json.loads(message)
+                        event_type: ConversationEvents = data["type"]
 
-                match event_type:
-                    case "media":
-                        media_event = MediaEvent(**data)
-                        decoded_audio = base64.b64decode(media_event.audio)
-                        conversation_orchestrator.audio_received(decoded_audio)
-                    case "mark":
-                        mark_event = MarkEvent(**data)
-                        chunk_idx = mark_event.mark_id.split("_")[-1]
-                        speech_idx = mark_event.mark_id.split("_")[-2]
-                        logger.debug(f"Mark Message received {message}")
+                        match event_type:
+                            case "media":
+                                media_event = MediaEvent(**data)
+                                decoded_audio = base64.b64decode(media_event.audio)
+                                conversation_orchestrator.audio_received(decoded_audio)
+                            case "mark":
+                                mark_event = MarkEvent(**data)
+                                chunk_idx = mark_event.mark_id.split("_")[-1]
+                                speech_idx = mark_event.mark_id.split("_")[-2]
+                                logger.debug(f"Mark Message received {message}")
 
-                        conversation_orchestrator.agent_speech_marked(
-                            speech_idx=int(speech_idx), chunk_idx=int(chunk_idx)
-                        )
-                    case _:
-                        logger.warning(f"Unknown event type: {event_type}")
-            except WebSocketDisconnect:
-                logger.info("WebSocket disconnected")
-                break
-    finally:
-        logger.info(
-            f"Cleaning up conversation {conversation_orchestrator.conversation.id}"
-        )
-        conversation_orchestrator.end_conversation()
+                                conversation_orchestrator.agent_speech_marked(
+                                    speech_idx=int(speech_idx), chunk_idx=int(chunk_idx)
+                                )
+                            case _:
+                                logger.warning(f"Unknown event type: {event_type}")
+                    except WebSocketDisconnect:
+                        logger.info("WebSocket disconnected")
+                        break
+            finally:
+                logger.info(
+                    f"Cleaning up conversation {conversation_orchestrator.conversation.id}"
+                )
+                conversation_orchestrator.end_conversation()
 
-    logger.info("Connection closed.")
+            logger.info("Connection closed.")
 
 
 async def handle_conversation_event(event: ConversationEvent, websocket: WebSocket):
