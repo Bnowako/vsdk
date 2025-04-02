@@ -120,7 +120,7 @@ class ConversationOrchestrator:
             result: RespondToHumanResult = RespondToHumanResult.empty()
             conversation.new_agent_speech_start()
             async for chunk in voice_agent.respond_to_human(
-                pcm_audio_buffer=conversation.human_speech_without_response,
+                pcm_audio_buffer=conversation.get_human_speech_without_response(),
                 sid=conversation.id,
                 callback=lambda x: result.update(x),
             ):

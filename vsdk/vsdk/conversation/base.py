@@ -139,25 +139,12 @@ class AgentVoice:
         )
 
 
-class Conversation:
-    def __init__(self, id: str):
-        self.id = id
-
-        # Audio IN
-        # TODO extract all of those to separate class HumanSpeech
-        # this class should be responsible for managing human speech and be aware of the current state of each speech
+class HumanVoice:
+    def __init__(self):
         self.pcm_audio_buffer: bytes = b""
         self.new_pcm_audio: bytes = b""
         self.last_human_speech: bytes = b""
         self.human_speech_without_response: bytes = b""
-
-        # Thinking
-        self.agent_response_tasks: List[AgentResponseTask] = []
-
-        # Audio OUT
-        self.agent_voice = AgentVoice(id)
-
-        self.audio_interpreter_loop: Task[None] | None = None
 
     # Human Voice
     def audio_received(self, pcm_audio: bytes) -> None:
@@ -171,7 +158,7 @@ class Conversation:
         logger.debug(f"👩🏼🗣️ Clearing client data state {self.state_string()}")
         self.pcm_audio_buffer = b""
 
-    def get_data_to_process_and_clear(self):
+    def get_data_to_process_and_clear(self) -> bytes:
         k = (
             len(self.new_pcm_audio) // Config.Audio.silero_samples_size_bytes
         ) * Config.Audio.silero_samples_size_bytes
@@ -195,14 +182,16 @@ class Conversation:
                 f"👩🏼🗣️ Human speech ended invoked but end_sample is None. start_sample: {speech_result.start_sample}, end_sample: {speech_result.end_sample}"
             )
 
-    def prepare_human_speech_for_interpretation(self):
+    def prepare_human_speech_for_interpretation(
+        self, human_speech_without_response_buffers: List[bytes]
+    ):
         """
         Prepare human speech for interpretation by adding all previous human speeches and last human speech
         This function will cancel all unfinished tasks and add them to the buffer
         :return:
         """
         logger.debug("👩🏼🗣Preparing human speech for interpretation.")
-        human_speech_without_response_buffers = self._cancel_unfinished_tasks()
+
         if human_speech_without_response_buffers:
             human_speech_without_response = (
                 (b"\x00" * 2 * 80).join(human_speech_without_response_buffers)
@@ -225,7 +214,54 @@ class Conversation:
         )  # 2 bytes per sample for 16-bit audio
         return self.pcm_audio_buffer[from_bytes:to_bytes]
 
-    # Agent Voice
+    def state_string(self):
+        return f"Conversation state:  new_pcm_audio: {len(self.new_pcm_audio)} pcm_audio_buffer: {len(self.pcm_audio_buffer)} human_speech_without_response: {len(self.human_speech_without_response)}"  # todo add more to this log
+
+    def is_new_audio_ready_to_process(self):
+        return len(self.new_pcm_audio) >= Config.Audio.silero_samples_size_bytes
+
+
+class Conversation:
+    def __init__(self, id: str):
+        self.id = id
+
+        # Audio IN
+        self.human_voice = HumanVoice()
+
+        # Thinking
+        self.agent_response_tasks: List[AgentResponseTask] = []
+
+        # Audio OUT
+        self.agent_voice = AgentVoice(id)
+
+        self.audio_interpreter_loop: Task[None] | None = None
+
+    # Human Voice
+    def audio_received(self, pcm_audio: bytes) -> None:
+        self.human_voice.audio_received(pcm_audio)
+
+    def clear_human_speech(self) -> None:
+        self.human_voice.clear_human_speech()
+
+    def get_data_to_process_and_clear(self):
+        return self.human_voice.get_data_to_process_and_clear()
+
+    def human_speech_ended(self, speech_result: VADResult) -> None:
+        self.human_voice.human_speech_ended(speech_result=speech_result)
+
+    def prepare_human_speech_for_interpretation(self) -> None:
+        human_speech_without_response_buffers = self._cancel_unfinished_tasks()
+        self.human_voice.prepare_human_speech_for_interpretation(
+            human_speech_without_response_buffers=human_speech_without_response_buffers
+        )
+
+    def is_new_audio_ready_to_process(self):
+        return self.human_voice.is_new_audio_ready_to_process()
+
+    def get_human_speech_without_response(self):
+        return self.human_voice.human_speech_without_response
+
+    # Audio OUT
     def new_agent_speech_start(self):
         self.agent_voice.new_speech_started()
 
@@ -248,12 +284,11 @@ class Conversation:
         return self.agent_voice.is_speaking()
 
     # Thinking
-
     def add_agent_response_task(self, task: Task[None]):
         logger.debug("🧠 Adding agent response task.")
         self.agent_response_tasks.append(
             AgentResponseTask(
-                task=task, human_speech=self.human_speech_without_response
+                task=task, human_speech=self.get_human_speech_without_response()
             )
         )
 
@@ -284,12 +319,6 @@ class Conversation:
             self.audio_interpreter_loop.cancel()
         else:
             logger.warning("💬 Audio interpreter loop not found. Cannot cancel.")
-
-    def is_new_audio_ready_to_process(self):
-        return len(self.new_pcm_audio) >= Config.Audio.silero_samples_size_bytes
-
-    def state_string(self):
-        return f"Conversation state:  new_pcm_audio: {len(self.new_pcm_audio)} pcm_audio_buffer: {len(self.pcm_audio_buffer)} human_speech_without_response: {len(self.human_speech_without_response)}"  # todo add more to this log
 
     def vad_update(self, vad_result: VADResult | None):
         if vad_result is None:
