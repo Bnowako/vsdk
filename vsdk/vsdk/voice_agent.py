@@ -27,15 +27,15 @@ class VoiceAgent:
 
     async def respond_to_human(
         self,
-        pcm_audio_buffer: bytes,
+        human_speech: bytes,
         id: str,
         callback: Callable[[RespondToHumanResult], None],
     ) -> AsyncIterator[AudioChunk]:
         logger.info(
-            f"Human speach detected, triggering response flow. PCM buffer duration {len(pcm_audio_buffer) // Config.Audio.bytes_per_sample / Config.Audio.sample_rate}s"
+            f"Human speach detected, triggering response flow. PCM buffer duration {len(human_speech) // Config.Audio.bytes_per_sample / Config.Audio.sample_rate}s"
         )
 
-        stt_result = await self.stt(pcm_audio_buffer)
+        stt_result = await self.stt(human_speech)
         logger.info("STT results: %s", stt_result.transcript)
 
         llm_result = LLMResult.empty()

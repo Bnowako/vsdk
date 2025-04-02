@@ -127,7 +127,7 @@ class ConversationOrchestrator:
             self.conversation.new_agent_speech_start()
 
             async for chunk in self.voice_agent.respond_to_human(
-                pcm_audio_buffer=human_speech,
+                human_speech=human_speech,
                 id=self.conversation.id,
                 callback=lambda x: result.update(x),
             ):
