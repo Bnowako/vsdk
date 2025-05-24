@@ -1,44 +1,66 @@
-# vsdk
+<p align="center">
+  <img src="docs/vsdk_logo_small.png" alt="vsdk logo" width="200"/>
+</p>
 
-![vsdk](docs/vsdk.png)
+<h1 align="center">vsdk</h1>
 
-Production **not ready** voice sdk. If you want something serious use [pipecat](https://github.com/pipecat-ai/pipecat) or [livekit](https://github.com/livekit/livekit)
+<p align="center">
+  <strong>A fun, educational, and admittedly hacky voice SDK.</strong>
+  <br />
+  <em>Production not ready. For serious projects, consider <a href="https://github.com/pipecat-ai/pipecat">pipecat</a> or <a href="https://github.com/livekit/livekit">livekit</a>.</em>
+</p>
 
-This is fun project, mostly for educational purposes. 
+## Why this project even exists?
+Together with my best friend we were curious how hard it would be to write it without external orchestrating libraries, so we hacked it in few days. We also wrote article about our voice-ai journey.
 
-You can probably find leaking buffers, it's hacky, it's also very cool because it works.
+**Coolest Feature:** The agent can pause its speech when you interject with short phrases like "mhmm" and then seamlessly resume.
 
-The coolest feature is that the agent is able to stop speaking while you say something short for example "mhmm" and then resume.
+You might find leaking buffers. It's hacky, but it works, and that's pretty cool.
 
-### Why this project even exists?
-Together with my best friend we were curious how hard it would be to write it without external orchestrating libraries, so we hacked it in few days. We also wrote [article](https://nomore.engineering/blog/voice-agents) about our voice-ai journey.
-
-Co-authored by: [@moscicky](https://github.com/moscicky)
+Authors [@bnowako](https://github.com/bnowako), [@moscicky](https://github.com/moscicky)
 
 ## Getting Started
-(you need python, uv and api keys from openai, groq, elevenlabs)
 
-1. Run `make install`
-2. Setup env variables in `backend/.env` file based on `backend/.env.example`
-3. Run `make run`
-4. Open http://localhost:8000/vsdk and try talking to the agent
+### Prerequisites
 
-### Twilio
-Twilio compatible ws interface is implemented in backend example, and available at http://localhost:8000/twilio
+* Python
+* uv
+* API keys for OpenAI, Groq, and ElevenLabs
 
-### Implementing your own interfaces
-```python
-class VoiceAgent:
-    def __init__(
-        self,
-        stt: BaseSTT,
-        tts: BaseTTS,
-        agent: BaseAgent,
-    ) -> None:
-        self.stt = stt
-        self.tts = tts
-        self.agent = agent
-```
-If you want you can implement your own Agent with custom logic, or implement STT/TTS services from different providers.
+### Installation
 
+1. Install packages:
+   ```sh
+   make install
+   ```
+2. Set up environment variables:
+    * Create a `.env` file in the `backend` directory.
+    * Use `backend/.env.example` as a template.
+3. Run the application:
+   ```sh
+   make run
+   ```
+4. Open [http://localhost:8000/vsdk](http://localhost:8000/vsdk) in your browser and start talking to the agent.
+
+## Features
+
+* **Twilio Integration:** A Twilio-compatible WebSocket interface is available at `http://localhost:8000/twilio`.
+* **Customizable Interfaces:** You can implement your own `Agent` with custom logic or integrate STT/TTS services from different providers.
+
+   ```python
+   class VoiceAgent:
+       def __init__(
+           self,
+           stt: BaseSTT,
+           tts: BaseTTS,
+           agent: BaseAgent,
+       ) -> None:
+           self.stt = stt
+           self.tts = tts
+           self.agent = agent
+   ```
+
+## Contact
+
+Błażej Nowakowski - [@bnowako](https://x.com/bnowako)
 
