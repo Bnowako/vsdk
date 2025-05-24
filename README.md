@@ -15,7 +15,7 @@
 </p>
 
 ## Why this project even exists?
-Together with my best friend we were curious how hard it would be to write it without external orchestrating libraries, so we hacked it in few days. We also wrote article about our voice-ai journey.
+Together with my best friend we were curious how hard it would be to write it without external orchestrating libraries, so we hacked it in few days. We also wrote [article](https://nomore.engineering/blog/voice-agents) about our voice-ai journey.
 
 **Coolest Feature:** The agent can pause its speech when you interject with short phrases like "mhmm" and then seamlessly resume.
 
