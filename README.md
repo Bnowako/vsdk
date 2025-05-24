@@ -13,7 +13,7 @@ Together with my best friend we were curious how hard it would be to write it wi
 
 Co-authored by: [@moscicky](https://github.com/moscicky)
 
-## Geting Started
+## Getting Started
 (you need python, uv and api keys from openai, groq, elevenlabs)
 
 1. Run `make install`
