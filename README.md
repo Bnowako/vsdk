@@ -5,9 +5,13 @@
 <h1 align="center">vsdk</h1>
 
 <p align="center">
-  <strong>A fun, educational, and admittedly hacky voice SDK.</strong>
+  <strong>A fun, educational,hacky Voice SDK.</strong>
   <br />
-  <em>Production not ready. For serious projects, consider <a href="https://github.com/pipecat-ai/pipecat">pipecat</a> or <a href="https://github.com/livekit/livekit">livekit</a>.</em>
+  <em>Production <strong>not ready</strong>. For serious projects, consider <a href="https://github.com/pipecat-ai/pipecat">pipecat</a> or <a href="https://github.com/livekit/livekit">livekit</a>.</em>
+</p>
+
+<p align="center">
+<img src="docs/vsdk.png">
 </p>
 
 ## Why this project even exists?
