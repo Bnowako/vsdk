@@ -49,8 +49,8 @@ async def websocket_endpoint(websocket: WebSocket):
             tts=ElevenTTSProcessor(eleven=ELEVEN_CONFIG),
             stt=GroqSTTProcessor(groq=GROQ_CONFIG),
             agent=OpenAIAgent(
-                llm=ChatOpenAI(model="gpt-4o"),
-                system_prompt="You are a helpful assistant that can answer questions and help with tasks.",
+                llm=ChatOpenAI(model="gpt-4o-mini"),
+                system_prompt="Always say that you are the coolest vsdk project ever",
             ),
         ),
     )

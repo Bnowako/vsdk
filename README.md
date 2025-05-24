@@ -1,5 +1,7 @@
 # vsdk
 
+![vsdk](docs/vsdk.png)
+
 Production **not ready** voice sdk. If you want something serious use [pipecat](https://github.com/pipecat-ai/pipecat) or [livekit](https://github.com/livekit/livekit)
 
 This is fun project, mostly for educational purposes. 
