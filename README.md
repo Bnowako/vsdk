@@ -11,6 +11,8 @@ The coolest feature is that the agent is able to stop speaking while you say som
 ### Why this project even exists?
 Together with my best friend we were curious how hard it would be to write it without external orchestrating libraries, so we hacked it in few days. We also wrote [article](https://nomore.engineering/blog/voice-agents) about our voice-ai journey.
 
+Co-authored by: [@moscicky](https://github.com/moscicky)
+
 ## Geting Started
 (you need python, uv and api keys from openai, groq, elevenlabs)
 
